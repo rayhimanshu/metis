@@ -8,7 +8,7 @@
 <h1 align="center">Metis</h1>
 
 <p align="center">
-  <em>Distributed coordination for autonomous AI agents via append-only event ledger and lease-based mutual exclusion.</em>
+  <em>Three autonomous coding agents. One shared ledger. No manager.</em>
 </p>
 
 <p align="center">
@@ -19,20 +19,34 @@
 
 </p>
 
-### Substrate, not orchestrator
+### SWE writes it. DevOps ships it. Tester breaks it.
 
-Three autonomous Claude agents — **SWE**, **DevOps**, **Tester** — operate independently on the same codebase, coordinated through an append-only SQLite ledger. No central orchestrator. No message broker. No state consensus algorithm.
+Three Claude sessions, three terminals, one codebase — and nobody telling any of
+them what to do. Work arrives from Jira or Trello. They leave notes for each
+other in a shared ledger and get on with it.
 
-Each agent:
-- Runs as a separate Claude session in its own terminal
-- Reasons, acts, observes, and retries independently
-- Claims exclusive leases (with TTL, all-or-nothing, sorted acquisition) before mutating shared resources
-- Posts typed events to the ledger: `code_ready`, `build_passed`, `deploy_started`, `test_failed`, etc.
-- Awaits or tails events from other agents to react
+```
+#11  09:08:15 requirement      intake    [api]
+       why: Trello LG-42: Add a health-check endpoint
+#14  09:12:03 test_failed      tester    [api] <-#11
+       why: endpoint 500s when the cache is cold
+#16  09:19:02 code_ready       swe       [api] <-#14
+       why: initialise the cache before the probe reads it
+#18  09:20:44 build_passed     devops    [api] <-#16
+#21  09:23:18 test_passed      tester    [api] <-#16
+```
 
-Writes are **serialized** — every mutation goes through `BEGIN IMMEDIATE`, so leases and events have one total order and two agents can never hold conflicting locks. Reads are **catch-up**: each agent keeps a cursor, so an agent that was not running when something happened reads it on return rather than missing it. And **ground truth is kept apart from testimony**: what the harness observed (hooks) versus what an agent claims it did.
+Fifteen minutes. A card became a fix, the regression in the middle repaired
+itself, and nobody was in the loop.
 
-Work arrives from Jira or Trello. The agents ingest it, implement it, build, test, deploy, and self-repair on failure. Nothing orchestrates them. A deterministic substrate gives them shared memory, communication primitives, and safety enforcement that cannot be bypassed by a prompt.
+That `<-#14` is a receipt. Every event names the one that caused it, so you can
+always ask *why did this happen* and get an answer instead of a guess.
+
+And when an agent has a clever idea — like quietly editing the test that just
+caught it — it doesn't get to. The rules are code, not requests.
+
+Metis is told nothing about your language, your cloud, or your services. It
+reads the repo and works it out.
 
 | | |
 |---|---|
