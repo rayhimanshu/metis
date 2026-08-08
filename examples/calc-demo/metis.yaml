@@ -1,0 +1,21 @@
+# Demo config: all three agents attached, so you can watch each one reason
+# in its own terminal. Spawned mode hides the work in log files.
+
+run:
+  workspace: .
+  environment: local
+  max_iterations: 4
+
+agents:
+  swe:
+    mode: attached
+    role: roles/swe.md
+    wake_on: [requirement, build_failed, test_failed, review_findings]
+  devops:
+    mode: attached
+    role: roles/devops.md
+    wake_on: [code_ready, deploy_requested, approved]
+  tester:
+    mode: attached
+    role: roles/tester.md
+    wake_on: [build_passed, deployed]

@@ -11,6 +11,11 @@ metis.yaml
 .claude/
 .DS_Store
 
+# Examples ship their own config -- it is the point of the example.
+!examples/**/metis.yaml
+examples/**/venv/
+examples/**/.metis/
+
 # Build output that appears inside the fixtures if anything actually builds them.
 fixtures/**/target/
 fixtures/**/.gradle/
