@@ -190,3 +190,23 @@ def test_summary_points_at_the_next_step(tmp_path):
     assert "metis discover" in text
     assert "metis install-hooks" in text
     assert "metis intake" not in text  # no work source, so not relevant
+
+
+def test_trello_gets_both_list_transitions(tmp_path, monkeypatch):
+    """Trello has no workflow states -- a transition is a card changing list."""
+    monkeypatch.setattr(wizard, "WORK_SOURCES", {"3": ("trello", "Trello")})
+    ask = answerer({
+        "choose": "3",
+        "board id": "abc123",
+        "pull cards from": "Ready for Dev",
+        "when picked up": "Doing",
+        "tests pass": "Done",
+    })
+
+    outcome = wizard.run(ask=ask, root=tmp_path, interactive=True, store_secrets=False)
+    trello = load(outcome.config_path).intake["trello"]
+
+    assert trello["board_id"] == "abc123"
+    assert trello["list_name"] == "Ready for Dev"
+    assert trello["on_start"] == "Doing"
+    assert trello["on_done"] == "Done"
