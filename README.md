@@ -7,7 +7,9 @@
 
 <h1 align="center">Metis</h1>
 
-<p align="center">A substrate for autonomous engineering agents</p>
+<p align="center">
+  <em>Three autonomous agents. One shared truth. No manager.</em>
+</p>
 
 <p align="center">
 
@@ -17,46 +19,49 @@
 
 </p>
 
-Three Claude sessions — **SWE**, **DevOps**, **Tester** — working autonomously on
-the same goal, in separate terminals, coordinating through a shared bus.
+### Three agents work, without a manager
 
-Work arrives from an issue tracker. The agents pick it up, implement it, build,
-deploy, verify, and repair their own regressions. Nothing drives them; a small
-piece of deterministic infrastructure gives them a way to talk, a shared memory,
-and enough safety rails that two of them cannot break the same thing at once.
+A **Coder** writes features. A **Builder** deploys them. A **Tester** verifies they work — and catches what breaks.
 
-Nothing in the system is told about a language, a cloud, or a service.
+Each runs as a Claude session in its own terminal, thinking independently. But they share one ledger of what has happened. That ledger is dumb: it only records. It doesn't decide. It doesn't judge. But it sees everything, and it enforces the rules.
 
-- **[SETUP.md](SETUP.md)** — install, pick your repos, connect Jira or Trello, troubleshoot
-- **[DESIGN.md](DESIGN.md)** — architecture, and why a substrate rather than an orchestrator
-- **[PROTOCOL.md](PROTOCOL.md)** — bus schema, event types, lock keys
-- **[AUDIT.md](AUDIT.md)** — seeing what happened, and diagnosing what is not
-- **[metis/roles/](metis/roles/)** — the operational prompt for each agent
+Work arrives from an issue tracker. The agents pick it up, implement it, build, deploy, verify, and repair their own regressions. Nothing tells them what to do; a small piece of deterministic infrastructure gives them a way to talk, a shared memory, and safety rails so precise that two of them cannot break the same thing at once.
+
+The system knows nothing about your language, your cloud, or your services. It learns from your code.
+
+| | |
+|---|---|
+| **[SETUP.md](SETUP.md)** | install, pick your repos, connect Jira or Trello, go live |
+| **[DESIGN.md](DESIGN.md)** | why a substrate, not an orchestrator — the boundary between dumb and smart |
+| **[PROTOCOL.md](PROTOCOL.md)** | the ledger: schema, event types, locks, and how changes that span repos stay coherent |
+| **[AUDIT.md](AUDIT.md)** | seeing every decision, every pause, every fault — and why each one happened |
+| **[metis/roles/](metis/roles/)** | the prompt for each agent — SWE, DevOps, Tester |
 
 ---
 
 ## Install
 
-Requires Python 3.11+. [pipx](https://pipx.pypa.io) is recommended so Metis gets
-its own environment and still lands on your PATH.
+Requires **Python 3.11+**.
+
+**Recommended:** [pipx](https://pipx.pypa.io) isolates Metis in its own environment while putting it on your PATH:
 
 ```bash
 pipx install git+https://github.com/rayhimanshu/metis.git
 ```
 
-Or with uv:
+**Or with uv** (faster, newer):
 
 ```bash
 uv tool install git+https://github.com/rayhimanshu/metis.git
 ```
 
-Or plain pip, into a virtualenv you manage:
+**Or plain pip** into a virtualenv you manage:
 
 ```bash
 pip install git+https://github.com/rayhimanshu/metis.git
 ```
 
-Check it:
+**Verify:**
 
 ```bash
 metis --version
@@ -74,251 +79,299 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]" && .venv/bin/pytest -q
 
 ## Quick start
 
-Run the guided setup in the repo you want agents to work on:
+### 1. Setup — first time only
+
+Go to the project you want agents to work on:
 
 ```bash
+cd ~/path/to/your-project
 metis setup
 ```
 
-It asks for a workspace and an environment name — both with defaults — then what
-you want to connect. **Nothing else is required unless you ask for it.** Choose
-no work source and you are never asked for a token; choose Jira and its URL,
-email, and API token become required, and are verified against the live service
-before the wizard finishes.
+It asks a few questions. Press enter to take defaults, or customize:
 
-Pressing enter through every question produces a working configuration. It is
-re-runnable, offers your previous answers as defaults, and backs up an existing
-`metis.yaml` before rewriting it.
-
-| What | Required | Default |
+| What | Required? | Default |
 |---|---|---|
-| Workspace | yes | current directory |
+| Workspace directory | yes | current directory |
 | Environment name | yes | `dev` |
-| Iteration cap | yes | `4` |
-| Agent modes | yes | swe attached, devops + tester spawned |
-| Work source | no | none — start runs by hand |
-| Jira URL, email, API token | only if Jira | — |
+| Iteration cap per run | yes | `4` |
+| How to run agents | yes | SWE attached, DevOps/Tester spawned |
+| Work source (Jira/Trello/none) | no | none |
+| Jira URL, email, token | only if Jira | — |
 | Trello board, key, token | only if Trello | — |
-| Git token | no | uses `gh` if authenticated; without it agents build and test but cannot push |
+| GitHub token | no | auto-detect via `gh` |
 
-For just a config file with no questions, `metis init` still works.
+Pressing enter through all questions produces a working config. The wizard is re-runnable and backs up your old config first.
 
-See what Metis makes of your repos — this writes nothing into your project:
+For a silent config file without prompts: `metis init`.
+
+### 2. Discover — see what Metis understands about your code
 
 ```bash
 metis discover
 ```
 
-Check the setup:
+Scans your repo(s) and outputs:
+- Every service/package to work on
+- Build commands it inferred
+- Capabilities it found (databases, caches, etc.) with confidence scores
+- Test coverage map
+- Lock keys — how agents can operate safely
 
-```bash
-metis doctor
-```
-
-Wire the safety hooks into that project's Claude settings. This merges rather
-than overwrites, and it refuses if `metis` is not on your PATH, because hooks
-pointing at a missing binary would silently never fire:
+### 3. Install safety hooks
 
 ```bash
 metis install-hooks
 ```
 
-Start a run, then open a session as an agent:
+Merges Metis hooks into your project's Claude settings. Refuses if `metis` is not on your PATH (prevents silent failures).
+
+### 4. Start your first run
 
 ```bash
 metis init-run --requirement "Add a health-check endpoint"
 ```
 
+Creates a run and waits for agents to pick up work.
+
+### 5. Open agent terminals
+
+Open four terminals in the project directory:
+
+**Terminal 1 — the ledger:**
+```bash
+metis watch
+```
+
+Streams the event log as it grows. Lets you see every decision.
+
+**Terminal 2 — the Coder:**
 ```bash
 METIS_ROLE=swe claude
 ```
 
-Without `METIS_ROLE` the hooks stay inert, so your ordinary sessions are
-unaffected.
+**Terminal 3 — the Builder:**
+```bash
+METIS_ROLE=devops claude
+```
 
-### Role prompts
+**Terminal 4 — the Tester:**
+```bash
+METIS_ROLE=tester claude
+```
 
-The three role prompts ship with the package, so a fresh install works with no
-files to create. To customise one, copy them into your project — project copies
-win:
+### Notes
+
+- Without `METIS_ROLE`, hooks stay inert — your normal Claude sessions are unaffected
+- The agents will wake each other via the ledger; keep `metis watch` running to see the coordination
+- Full setup docs: [SETUP.md](SETUP.md)
+
+### Customize agent prompts
+
+The three agent prompts ship inside the package, so a fresh install works with no files to create. To customize one:
 
 ```bash
 metis roles --eject
 ```
 
-### Which repositories agents work on
+Copies the prompts to your project. Project copies win over packaged ones.
 
-The workspace directory is the scope. Point it at one repository, or at a parent
-holding several — discovery treats each git root as its own target with its own
-`worktree:` lease, so agents can work on different repositories at once and
-never on the same one. Full detail, including cross-repo changes and the absence
-of an include/exclude filter, is in [SETUP.md](SETUP.md#choosing-what-agents-work-on).
+### Multi-repository workspaces
 
-## The idea in one paragraph
+The workspace is your scope. Point it at one repo, or at a parent holding several:
 
-A Claude session is already an agentic loop — it reasons, acts, observes, and
-retries. That does not need building. What is missing is communication, shared
-truth, and safety. So the shared component decides nothing: it records events,
-delivers them, grants leases, and enforces a stop condition. Everything above it
-is non-deterministic and smart; the substrate is deterministic and dull. That
-boundary is the design.
+```bash
+metis setup --workspace ~/projects/my-platform
+```
 
-## Discovery
+Discovery treats each git root as its own target with its own lock. Agents can work on different repositories simultaneously — never on the same one at the same time.
+
+Full details: [SETUP.md](SETUP.md#choosing-what-agents-work-on).
+
+## The philosophy
+
+A Claude session is already an agentic loop — **reason, act, observe, retry**. That works.
+
+What a single agent lacks is the ability to work alongside others on the same code. Add three agents, and you need: communication (so they know what the others did), shared truth (so they agree on what happened), and safety (so their independence doesn't become chaos).
+
+The substrate provides exactly those three things and nothing more. It records events, delivers them, grants leases, and enforces a stop condition. It decides nothing. It judges nothing. It only says: "you may act" or "you may not, because someone else is".
+
+Everything above the substrate — reasoning, strategy, repair — lives in the agents, where it's flexible and intelligent. Everything below — the ledger, the locks, the rules — is deterministic and predictable. That boundary is the design.
+
+## Discovery — learning the shape of the system
 
 ```bash
 metis discover /path/to/repo
 ```
 
-Accepts a git URL just as well. Produces every target, derived build commands,
-capabilities with the evidence that proved them, deploy identifiers lifted from
-CI, the test→target map, and **lock keys derived from all of it**.
+Accepts a git URL just as well. Scans the repo and produces:
 
-### Evidence tiers
+- Every target (each git root and built artifact)
+- Build commands, derived from manifests and CI config
+- Capabilities the code actually uses (S3, databases, caches, auth systems, etc)
+- Deploy shape — container registries, orchestration, load balancer health paths
+- Test-to-target mapping — which tests cover which services
+- **Lock keys** — derived from all of it, so agents can't collide
 
-| Signal | Meaning |
+**Nothing is guessed.** A capability only becomes actionable when the evidence justifies it. The bar:
+
+| Evidence | Is it real? |
 |---|---|
-| `declared` | a dependency coordinate in a build manifest |
-| `imported` | main source actually references the client |
-| `configured` | a config key names a concrete resource |
-| `provisioned` | IaC creates it and grants permissions |
+| Dependency declared in a manifest | Maybe declared but not used — not actionable |
+| + source actually imports it | Now it's real. Actionable. |
+| + a config key names a concrete resource | Even stronger. |
+| + IaC creates it and grants permissions | Definitive. The platform agrees. |
 
-A capability is acted on only when **declared AND imported**. Everything else is
-reported with the reason it fell short:
+A result like this is typical:
 
 ```
-skipped (reported, not acted on):
-  - maven-service/firestore [medium] declared and configured, but no main-source
-    usage found -- the dependency is present without evidence the code exercises it
+✓ redis [high]      declared + imported + configured
+  └ used in cache layer, config has REDIS_HOST set
+
+skip postgres [medium]  declared, configured, but no source import
+  └ dependency present, config ready, code doesn't exercise it
+  
+skip dynamodb [low]  imported in test fixtures only
+  └ strong signal but test-only, won't load in production
 ```
 
-That rule is what makes unattended operation defensible — the system declines
-what it cannot justify instead of guessing. IaC never creates a finding on its
-own; it enriches one, and it *bounds* behaviour: a role granted only
-`s3:GetObject` yields a read-only probe rather than a write that was always
-going to fail.
+That rule — **decline what you cannot justify** — is what makes unattended operation defensible. No guessing. No wishful thinking. IaC never creates a finding on its own; it enriches one. Permissions are bounds: an agent granted `s3:GetObject` gets a read-only probe, not a write that was always going to fail.
 
-## The bus
+## The ledger protocol
+
+The ledger is the substrate. Agents interact with it via CLI:
 
 ```bash
-metis init-run --requirement "Add an S3 health probe"
+# Claim exclusive access to a target
+metis claim worktree:api@main --ttl 900
+
+# Record an event
+metis post --type code_ready --target api --rationale "renamed the schema"
+
+# Wait for an event matching a pattern
+metis await --type build_passed --target api --timeout 600
+
+# Stream all events
+metis tail --agent swe
 ```
 
-```bash
-METIS_ROLE=swe metis claim worktree:api@main --ttl 900
-```
+**Exit codes are part of the contract:** agents branch on them:
+- `0` — allowed, or event found
+- `1` — refused (safety rule blocked it, or resource held elsewhere)
+- `2` — the run is over
 
-```bash
-METIS_ROLE=swe metis post --type code_ready --target api --caused-by 1 --rationale "..."
-```
+## Running the agents — attached or spawned
 
-```bash
-METIS_ROLE=devops metis tail
-```
+Each agent can run **attached** (you open a terminal, the agent stays in it, woken by `metis tail`) or **spawned** (each event triggers a new claude session with context, the session runs, then exits).
 
-Exit codes are part of the contract, because agents branch on them: `0` granted,
-`1` refused, `2` the run is over.
+**Recommended:**
+- **SWE attached** — code changes need iteration, human oversight
+- **DevOps spawned** — builds are deterministic, run fast and exit
+- **Tester spawned** — tests are deterministic, run fast and exit
 
-## Running the agents
+Configure it during setup. One hook config serves all three roles — the hooks read `$METIS_ROLE` at runtime.
 
-Each agent is **attached** (a session you open, woken by `metis tail` under a
-Monitor) or **spawned** (a cold `claude -p` per event). Configured per agent;
-recommended default is SWE attached, DevOps and Tester spawned.
+## Safety — enforced before a prompt is written
 
-```bash
-METIS_ROLE=swe claude
-```
+Rules are not advice. They are enforced by hooks before the tool runs. An agent cannot talk itself around them because the check happens *before* the attempt, not after.
 
-```bash
-metis dispatch --dry-run
-```
+| Principle | Rule | Enforced by |
+|---|---|---|
+| **Separation of concerns** | DevOps cannot edit source code | `PreToolUse` hook |
+| | SWE and Tester cannot deploy or push | `PreToolUse` hook |
+| **Signal integrity** | Nobody edits the test that caught them | ledger-derived, tracked by hook |
+| **Approval boundary** | Only a human can post `approved` | bus refuses otherwise |
+| **Atomicity on cross-repo changes** | No repo in a change set is pushed until all build | `PreToolUse` hook |
+| **Lease enforcement** | An agent must hold every lock its action claims | lease broker |
+| **Iteration limits** | Past the cap, new claims are refused | lease broker |
+| **Observability safety** | Deep probes never attach to LB-polled paths | probe policy |
+| **Credential hygiene** | Secrets resolved, then redacted, never reversed | discovery |
 
-Run `metis install-hooks` in the project first. One hook config serves all three
-roles — the hooks read `$METIS_ROLE` at runtime, so there is no way to launch
-with the wrong hook set installed.
+**Agents never see raw tokens.** The substrate holds credentials and acts on their behalf. An agent cannot leak what it was never handed. Secrets are stored in the OS keychain, resolved at runtime only when needed, and redacted from every log before it's written.
 
-## Safety, enforced rather than requested
-
-| Rule | Where |
-|---|---|
-| DevOps cannot edit source | `PreToolUse` hook |
-| SWE and Tester cannot deploy or push | `PreToolUse` hook |
-| Nobody may edit the test that caught them | hook, derived from the ledger |
-| Only a human can post `approved` | the bus refuses otherwise |
-| An actuating agent must hold every declared lease | lease broker |
-| No repo in a change set is pushed until all of them build | `PreToolUse` hook |
-| Past the iteration cap, claims are refused | lease broker |
-| Deep probes never attach to a load-balancer-polled path | probe policy |
-| Secrets are resolved then redacted, never the reverse | discovery |
-
-Agents never see raw tokens. The substrate holds credentials and acts on their
-behalf, so an agent cannot leak what it was never handed.
-
-## Intake
+## Intake — from issue tracker to work
 
 ```bash
 metis setup jira
+# or
+metis setup trello
 ```
 
 ```bash
-metis intake --dry-run
+metis intake --dry-run      # preview what would be picked up
+metis intake                # pull ready cards into the run
 ```
 
-Issue text is **untrusted input**. Bodies are fenced between
-`<<<UNTRUSTED-ISSUE-TEXT` markers, instruction-shaped phrasing is *flagged rather
-than stripped*, and a ticket can never grant permission or name a target outside
-the workspace.
+**Issue text is untrusted input.** A Jira description or Trello card could contain anything — including instructions trying to trick an agent into doing something unsafe. Metis:
 
-## Audit
+- Wraps issue bodies between `<<<UNTRUSTED-ISSUE-TEXT` and `>>>` markers
+- Flags instruction-shaped phrasing (e.g., "edit this file", "run this command") rather than stripping it
+- Prevents a ticket from naming a target (repo, service, environment) outside the workspace — the card can only work on what discovery found
+- Validates credentials before storing them — if you mistype your Jira URL or API token, the wizard catches it before it's too late
+
+## Audit — see everything, trust what can be verified
 
 ```bash
-metis why 42
+metis why 42               # why did event #42 happen? trace back to what caused it
+metis trace 1              # what did event #1 lead to? follow it forward
+metis watch                # stream the ledger as it grows
+metis report --out run.md  # timeline of every decision, every pause, every fault
 ```
 
-```bash
-metis trace 1
-```
+Two tiers of evidence, kept strictly apart:
 
-```bash
-metis watch
-```
+- **Ground truth** — commands that ran, files that changed, leases acquired and released. Written by hooks. Cannot be faked because they're hooks into the OS.
+- **Testimony** — what an agent *claims* it did, why it stopped, what it tried. Written by agents. Useful but fallible.
 
-```bash
-metis report --out run.md
-```
+When they disagree, believe the hooks. A hook says "your test ran and failed" is stronger than an agent saying "the test passed".
 
-Two tiers of evidence, kept apart: **ground truth** (commands, diffs, leases —
-written by hooks) and **testimony** (event types, rationale — written by agents).
-When they disagree, believe the hooks.
+Every event carries a `caused_by` field — the event that triggered it. Follow the chain backward and you see the decision tree. Follow it forward and you see the ripples. No guessing. No lost time wondering what happened and why.
 
-## Layout
+## Codebase layout
 
 ```
 metis/
-  bus/            schema, store, events, leases, context, audit
-  discovery/      scan, detectors, capabilities, iac, deployment, testing, keys
-  intake/         jira, trello, sync, untrusted-text handling
-  policy/         probe families and permission bounds
-  hooks/          PreToolUse (enforcement), PostToolUse (ground truth)
-  roles/          packaged agent prompts
-  enforcement.py  what each role may write and run
-  secrets.py      keychain-backed; never logged, never given to agents
-  dispatcher.py   spawned mode
-fixtures/         synthetic repos — the correctness bar
+  bus/
+    ├── schema.sql           SQLite ledger: events, leases, runs, cursors, changesets
+    ├── store.py            transactional store with write safety
+    ├── events.py           event posting, waiting, tailing, cursors
+    ├── leases.py           exclusive locks with TTL and all-or-nothing acquisition
+    ├── changesets.py       cross-repo change sets and the push gate
+    ├── context.py          build up the prompt a turn-based agent needs
+    ├── audit.py            trace, why, timeline, replay, run_checks
+    └── commands.py         CLI: claim, post, await, tail, etc.
+
+  discovery/
+    ├── scan.py             walk repos, find git roots, manifests
+    ├── capabilities.py     map source usage to capabilities (S3, databases, etc.)
+    ├── iac.py              parse Terraform, CloudFormation, AWS CDK
+    ├── deployment.py       find orchestration (ECS, K8s, Lambda, etc.)
+    ├── testing.py          map tests to targets, discover coverage
+    └── detectors/          per-language plugins for build/test commands
+
+  intake/
+    ├── jira.py             fetch, comment, transition in Jira
+    ├── trello.py           fetch, comment, move in Trello
+    └── sync.py             pull issues as requirements, push events as comments
+
+  hooks/                     Pre/Post tool-use enforcement
+    ├── __init__.py         dispatch, role-based checks
+    └── pre_tool_use.py     refusals before a tool runs (safety)
+
+  enforcement.py             what each role may write and run
+  secrets.py                 OS keychain-backed, never logged
+  dispatcher.py              spawned mode: one Claude session per event
 ```
 
-Hooks and role prompts live *inside* the package. A settings file pointing at
-`$SOMEWHERE/hooks/pre_tool_use.py` breaks the moment the tool is installed or
-moved; `metis hook pre` works wherever `metis` is on PATH.
+**Design decisions:**
+- Hooks and role prompts live inside the package so `metis hook pre` works everywhere `metis` is on PATH — no broken references after an install or move
+- Stack support is a plugin file (`discovery/detectors/lang.py`); capability signatures and probe families are data, so adding a backing service is an edit, not a release
+- Everything is testable offline; no external services, no network calls in tests
 
-Stack support is a plugin file under `discovery/detectors/`. Capability
-signatures and probe families are data, so adding a backing service is an edit,
-not a release.
-
-## Tests
+## Testing
 
 ```bash
 pytest -q
 ```
 
-All tests run against synthetic fixtures — no external services, no network,
-runs anywhere.
+210+ tests covering all modules, running against synthetic fixtures. Designed to run anywhere with no external services, no network, no secrets.
