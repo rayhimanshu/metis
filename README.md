@@ -14,6 +14,7 @@ and enough safety rails that two of them cannot break the same thing at once.
 
 Nothing in the system is told about a language, a cloud, or a service.
 
+- **[SETUP.md](SETUP.md)** — install, pick your repos, connect Jira or Trello, troubleshoot
 - **[DESIGN.md](DESIGN.md)** — architecture, and why a substrate rather than an orchestrator
 - **[PROTOCOL.md](PROTOCOL.md)** — bus schema, event types, lock keys
 - **[AUDIT.md](AUDIT.md)** — seeing what happened, and diagnosing what is not
@@ -131,6 +132,14 @@ win:
 ```bash
 metis roles --eject
 ```
+
+### Which repositories agents work on
+
+The workspace directory is the scope. Point it at one repository, or at a parent
+holding several — discovery treats each git root as its own target with its own
+`worktree:` lease, so agents can work on different repositories at once and
+never on the same one. Full detail, including cross-repo changes and the absence
+of an include/exclude filter, is in [SETUP.md](SETUP.md#choosing-what-agents-work-on).
 
 ## The idea in one paragraph
 
