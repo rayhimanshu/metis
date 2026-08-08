@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="metis-logo-title metis-logo-desc">
+  <title id="metis-logo-title">Metis</title>
+  <desc id="metis-logo-desc">Three interlocking chevrons forming an implied cube: three agents that hold together only as a set.</desc>
+
+  <!-- Identical geometry to logo.svg; only the ink inverts. Two files rather
+       than one CSS-driven file because GitHub strips <style> from rendered
+       markdown, so a self-theming SVG silently shows the wrong colours there. -->
+  <g fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 11.24 8.25 L 16.0 5.5 L 23.79 10.0 L 19.03 12.75" stroke="#F8F9FA" />
+    <path d="M 25.09 15.75 L 25.09 21.25 L 17.30 25.75 L 17.30 20.25" stroke="#F8F9FA" />
+    <path d="M 11.67 24.00 L 6.91 21.25 L 6.91 12.25 L 11.67 15.00" stroke="#F0555F" />
+  </g>
+</svg>

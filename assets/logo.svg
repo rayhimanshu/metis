@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="metis-logo-title metis-logo-desc">
+  <title id="metis-logo-title">Metis</title>
+  <desc id="metis-logo-desc">Three interlocking chevrons forming an implied cube: three agents that hold together only as a set.</desc>
+
+  <!-- No background rect: transparent, so the mark sits on whatever it is placed on.
+       For a solid-background version see logo-card.svg. -->
+  <g fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- SWE -->
+    <path d="M 11.24 8.25 L 16.0 5.5 L 23.79 10.0 L 19.03 12.75" stroke="#111827" />
+    <!-- DevOps -->
+    <path d="M 25.09 15.75 L 25.09 21.25 L 17.30 25.75 L 17.30 20.25" stroke="#111827" />
+    <!-- Tester, holding the lock -->
+    <path d="M 11.67 24.00 L 6.91 21.25 L 6.91 12.25 L 11.67 15.00" stroke="#E63946" />
+  </g>
+</svg>

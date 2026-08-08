@@ -1,8 +1,21 @@
-# Metis
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
+    <img src="assets/logo.svg" alt="Metis" width="96" height="96">
+  </picture>
+</p>
+
+<h1 align="center">Metis</h1>
+
+<p align="center">A substrate for autonomous engineering agents</p>
+
+<p align="center">
 
 [![CI](https://github.com/rayhimanshu/metis/actions/workflows/ci.yml/badge.svg)](https://github.com/rayhimanshu/metis/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+</p>
 
 Three Claude sessions — **SWE**, **DevOps**, **Tester** — working autonomously on
 the same goal, in separate terminals, coordinating through a shared bus.
