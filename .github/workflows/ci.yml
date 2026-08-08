@@ -56,7 +56,8 @@ jobs:
         run: |
           mkdir -p /tmp/project && cd /tmp/project
           /tmp/clean/bin/metis --version
-          /tmp/clean/bin/metis init
+          # Accepting every default must produce a working configuration.
+          printf '\n\n\n\n\n' | /tmp/clean/bin/metis setup
           /tmp/clean/bin/metis init-run --requirement "ci smoke test"
           /tmp/clean/bin/metis discover "$GITHUB_WORKSPACE/fixtures/workspace" --no-write
           /tmp/clean/bin/metis probes "$GITHUB_WORKSPACE/fixtures/workspace" --target maven-service

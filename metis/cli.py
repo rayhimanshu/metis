@@ -37,6 +37,14 @@ def cmd_init(args: argparse.Namespace) -> int:
 def cmd_setup(args: argparse.Namespace) -> int:
     from . import setup as setup_mod
 
+    # No arguments means "get me started", which is a wizard, not a listing.
+    if not args.integration and not args.list:
+        from . import wizard
+
+        outcome = wizard.run(root=Path(args.config).parent if args.config else None)
+        print(wizard.summarize(outcome))
+        return 0 if all(ok for _, ok, _ in outcome.verifications) else 1
+
     cfg = _load(args)
 
     if args.list or args.integration in (None, "list"):
@@ -141,8 +149,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_init.add_argument("--force", action="store_true")
     p_init.set_defaults(func=cmd_init)
 
-    p_setup = sub.add_parser("setup", help="store and verify integration credentials")
-    p_setup.add_argument("integration", nargs="?", help="jira | trello | git (omit to list)")
+    p_setup = sub.add_parser(
+        "setup", help="guided setup (no arguments), or configure one integration"
+    )
+    p_setup.add_argument("integration", nargs="?",
+                         help="jira | trello | git (omit for the guided wizard)")
     p_setup.add_argument("--list", action="store_true", help="show what is configured")
     p_setup.add_argument("--verify", action="store_true", help="make a live call when listing")
     p_setup.set_defaults(func=cmd_setup)

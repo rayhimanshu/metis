@@ -56,13 +56,36 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]" && .venv/bin/pytest -q
 
 ## Quick start
 
-Scaffold a config in the repo you want agents to work on:
+Run the guided setup in the repo you want agents to work on:
 
 ```bash
-metis init
+metis setup
 ```
 
-See what Metis makes of it — this writes nothing into your project:
+It asks for a workspace and an environment name — both with defaults — then what
+you want to connect. **Nothing else is required unless you ask for it.** Choose
+no work source and you are never asked for a token; choose Jira and its URL,
+email, and API token become required, and are verified against the live service
+before the wizard finishes.
+
+Pressing enter through every question produces a working configuration. It is
+re-runnable, offers your previous answers as defaults, and backs up an existing
+`metis.yaml` before rewriting it.
+
+| What | Required | Default |
+|---|---|---|
+| Workspace | yes | current directory |
+| Environment name | yes | `dev` |
+| Iteration cap | yes | `4` |
+| Agent modes | yes | swe attached, devops + tester spawned |
+| Work source | no | none — start runs by hand |
+| Jira URL, email, API token | only if Jira | — |
+| Trello board, key, token | only if Trello | — |
+| Git token | no | uses `gh` if authenticated; without it agents build and test but cannot push |
+
+For just a config file with no questions, `metis init` still works.
+
+See what Metis makes of your repos — this writes nothing into your project:
 
 ```bash
 metis discover
