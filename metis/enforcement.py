@@ -167,6 +167,9 @@ def check_write(
     return True, ""
 
 
+_PUSH = re.compile(r"\bgit\s+push\b")
+
+
 def check_command(role: str | None, command: str) -> tuple[bool, str]:
     """May this role run this shell command?"""
     for pattern, why in _UNIVERSAL:
@@ -184,6 +187,41 @@ def check_command(role: str | None, command: str) -> tuple[bool, str]:
                 "Post an event and let the responsible agent act."
             )
     return True, ""
+
+
+def check_changeset_push(store, run_id: str, command: str, cwd: str) -> tuple[bool, str]:
+    """Refuse to push one repository of a change set while a sibling is unbuilt.
+
+    Git cannot commit across repositories, so a cross-repo change is always N
+    pushes. Letting them go independently is how repo A lands, repo B fails, and
+    production ends up with two services disagreeing about a contract.
+
+    Checked rather than asked for, because it is precisely the rule an agent
+    under pressure to ship half a change would reason its way around.
+    """
+    if not _PUSH.search(command):
+        return True, ""
+
+    from .bus import changesets
+
+    target = _repo_name(cwd)
+    if not target:
+        return True, ""
+
+    return changesets.may_push(store, run_id, target)
+
+
+def _repo_name(cwd: str) -> str | None:
+    import subprocess
+
+    try:
+        proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"], cwd=cwd,
+            capture_output=True, text=True, check=False, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return Path(proc.stdout.strip()).name if proc.returncode == 0 and proc.stdout.strip() else None
 
 
 def denied_tests_from_bus(store, run_id: str) -> set[str]:

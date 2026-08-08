@@ -59,6 +59,7 @@ def post(
     rationale: str | None = None,
     tier: str | None = None,
     iteration: int | None = None,
+    change_set: str | None = None,
     secret_names: list[str] | None = None,
     allow_human_only: bool = False,
 ) -> int:
@@ -99,10 +100,10 @@ def post(
 
         cursor = conn.execute(
             "INSERT INTO events (run_id, ts, type, agent, target, environment, iteration,"
-            " payload, tier, caused_by, session_id, rationale)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " payload, tier, caused_by, session_id, rationale, change_set)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (run_id, now(), type, agent, target, environment or run["environment"],
-             iteration, body, tier, caused_by, session_id, rationale),
+             iteration, body, tier, caused_by, session_id, rationale, change_set),
         )
         return int(cursor.lastrowid)
 

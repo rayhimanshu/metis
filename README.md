@@ -223,6 +223,7 @@ with the wrong hook set installed.
 | Nobody may edit the test that caught them | hook, derived from the ledger |
 | Only a human can post `approved` | the bus refuses otherwise |
 | An actuating agent must hold every declared lease | lease broker |
+| No repo in a change set is pushed until all of them build | `PreToolUse` hook |
 | Past the iteration cap, claims are refused | lease broker |
 | Deep probes never attach to a load-balancer-polled path | probe policy |
 | Secrets are resolved then redacted, never the reverse | discovery |

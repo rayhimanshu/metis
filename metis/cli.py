@@ -169,7 +169,10 @@ def build_parser() -> argparse.ArgumentParser:
     from .intake import commands as intake_commands
     from .policy import commands as policy_commands
 
+    from .bus import changeset_commands
+
     bus_commands.register(sub)
+    changeset_commands.register(sub)
     audit_commands.register(sub)
     discovery_commands.register(sub)
     intake_commands.register(sub)
