@@ -1,0 +1,25 @@
+.venv/
+.metis/
+runs/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+metis.yaml
+.claude/
+.DS_Store
+
+# Build output that appears inside the fixtures if anything actually builds them.
+fixtures/**/target/
+fixtures/**/.gradle/
+fixtures/**/bin/
+fixtures/**/*.class
+
+# The fixtures deliberately contain vendor-shaped decoys -- discovery must prune
+# them, and tests assert that it does. They have to be committed, or a fresh
+# clone has nothing to prune and those tests pass while checking nothing.
+!fixtures/workspace/node-pnpm/node_modules/
+!fixtures/workspace/python-suite/venv/
+!fixtures/workspace/.hidden-tool/

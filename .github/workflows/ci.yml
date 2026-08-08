@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        run: pytest -q
+
+  wheel:
+    name: Wheel installs and runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: |
+          pip install build
+          python -m build --wheel
+
+      # An editable install reads straight from the source tree, so it cannot
+      # tell you whether the schema, capability signatures, and probe families
+      # actually shipped. Only a real install from a different directory can.
+      - name: Install the wheel into a clean environment
+        run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install dist/*.whl
+
+      - name: Run it from outside the repo
+        run: |
+          mkdir -p /tmp/project && cd /tmp/project
+          /tmp/clean/bin/metis --version
+          /tmp/clean/bin/metis init
+          /tmp/clean/bin/metis init-run --requirement "ci smoke test"
+          /tmp/clean/bin/metis discover "$GITHUB_WORKSPACE/fixtures/workspace" --no-write
+          /tmp/clean/bin/metis probes "$GITHUB_WORKSPACE/fixtures/workspace" --target maven-service
+          /tmp/clean/bin/metis roles

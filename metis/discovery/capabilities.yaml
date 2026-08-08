@@ -1,0 +1,224 @@
+# Capability signature table.
+#
+# Data, not code. Supporting a new backing service is an edit here -- no Python
+# change, no release.
+#
+# Each capability declares up to four independent signals, weighed by
+# capabilities.py, which never hardcodes a vendor:
+#
+#   deps          a dependency coordinate in a build manifest      -> declared
+#   imports       a substring proving main source uses the client  -> imported
+#   weak_imports  proves the *category* but not the vendor         -> weak_usage
+#   config        a dotted config key naming a real resource       -> configured
+#   iac           an infrastructure resource type                  -> provisioned
+#
+# `probe` names the generic health-probe family, so the probe policy never
+# learns a vendor name.
+#
+# `permissions` maps IAM actions to capability verbs. This is what bounds probe
+# depth: a role with only s3:GetObject yields a read-only probe instead of a
+# write that was always going to fail.
+
+s3:
+  label: AWS S3 object storage
+  probe: object_store
+  deps: ["software.amazon.awssdk:s3", "com.amazonaws:aws-java-sdk-s3", "@aws-sdk/client-s3", aws-sdk, boto3]
+  imports:
+    - software.amazon.awssdk.services.s3
+    - com.amazonaws.services.s3
+    - S3Client
+    - S3Presigner
+    - AmazonS3
+    - "@aws-sdk/client-s3"
+    - "boto3.client(\"s3\")"
+    - "boto3.client('s3')"
+    - "boto3.resource(\"s3\")"
+  config: ["*.s3.*bucket*", "*s3*bucket*", "aws.s3.*", "AWS_S3_*", "S3_BUCKET*"]
+  iac: [aws_s3_bucket, "AWS::S3::Bucket"]
+  permissions:
+    read: ["s3:GetObject"]
+    write: ["s3:PutObject"]
+    delete: ["s3:DeleteObject"]
+    list: ["s3:ListBucket"]
+
+gcs:
+  label: Google Cloud Storage
+  probe: object_store
+  deps: ["com.google.cloud:google-cloud-storage", "@google-cloud/storage", google-cloud-storage]
+  imports: [com.google.cloud.storage, "@google-cloud/storage", "from google.cloud import storage"]
+  config: ["*gcs*bucket*", "*storage*bucket*", "GCS_BUCKET*"]
+  iac: [google_storage_bucket]
+  permissions:
+    read: ["storage.objects.get"]
+    write: ["storage.objects.create"]
+    delete: ["storage.objects.delete"]
+
+azure_blob:
+  label: Azure Blob Storage
+  probe: object_store
+  deps: ["com.azure:azure-storage-blob", "@azure/storage-blob", azure-storage-blob]
+  imports: [com.azure.storage.blob, "@azure/storage-blob", azure.storage.blob]
+  config: ["*blob*container*", "AZURE_STORAGE_*"]
+  iac: [azurerm_storage_container]
+
+postgres:
+  label: PostgreSQL
+  probe: relational
+  deps: ["org.postgresql:postgresql", psycopg2, psycopg2-binary, psycopg, pg, "@types/pg"]
+  imports: [org.postgresql, psycopg2, "require('pg')"]
+  # Every JPA project imports these, so alone they identify a category and not a
+  # vendor. They count only alongside a declared driver, which is what stops one
+  # ORM import from claiming every SQL database at once.
+  weak_imports: [jakarta.persistence, javax.persistence]
+  config: ["spring.datasource.url", "spring.datasource.*", DATABASE_URL, "DB_HOST*", "POSTGRES_*"]
+  iac: [aws_db_instance, aws_rds_cluster, "AWS::RDS::DBInstance", google_sql_database_instance]
+
+mysql:
+  label: MySQL / MariaDB
+  probe: relational
+  deps: ["com.mysql:mysql-connector-j", "mysql:mysql-connector-java", mysql2, mysqlclient, PyMySQL]
+  imports: ["com.mysql.cj", pymysql, "require('mysql2')"]
+  weak_imports: [jakarta.persistence, javax.persistence]
+  config: ["spring.datasource.url", "MYSQL_*", "DB_HOST*"]
+  iac: [aws_db_instance, "AWS::RDS::DBInstance"]
+
+mongo:
+  label: MongoDB
+  probe: document_store
+  deps: ["org.mongodb:mongodb-driver-sync", "org.springframework.boot:spring-boot-starter-data-mongodb", mongoose, mongodb, pymongo]
+  imports: [com.mongodb, org.springframework.data.mongodb, mongoose, pymongo]
+  config: ["spring.data.mongodb.*", "MONGO*_URI", "MONGODB_*"]
+  iac: [aws_docdb_cluster, mongodbatlas_cluster]
+
+firestore:
+  label: Google Firestore
+  probe: document_store
+  deps: ["com.google.firebase:firebase-admin", "com.google.cloud:google-cloud-firestore", firebase-admin, "@google-cloud/firestore", google-cloud-firestore]
+  imports:
+    - com.google.cloud.firestore
+    - com.google.firebase.cloud.FirestoreClient
+    - FirestoreClient
+    - getFirestore
+    - "from google.cloud import firestore"
+  config: ["firebase.*", "FIREBASE_*", GOOGLE_APPLICATION_CREDENTIALS]
+  iac: [google_firestore_database]
+
+fcm:
+  label: Firebase Cloud Messaging
+  probe: push_messaging
+  deps: ["com.google.firebase:firebase-admin", firebase-admin]
+  imports: [com.google.firebase.messaging, FirebaseMessaging, getMessaging]
+  config: ["firebase.*", "FIREBASE_*"]
+
+redis:
+  label: Redis
+  probe: key_value
+  deps: ["org.springframework.boot:spring-boot-starter-data-redis", "redis.clients:jedis", ioredis, redis]
+  imports: [org.springframework.data.redis, redis.clients.jedis, ioredis, "import redis"]
+  config: ["spring.data.redis.*", "spring.redis.*", "REDIS_*"]
+  iac: [aws_elasticache_cluster, aws_elasticache_replication_group]
+
+kafka:
+  label: Apache Kafka
+  probe: message_broker
+  deps: ["org.apache.kafka:kafka-clients", "org.springframework.kafka:spring-kafka", kafkajs, kafka-python, confluent-kafka]
+  imports: [org.apache.kafka, org.springframework.kafka, kafkajs, "from kafka import"]
+  config: ["spring.kafka.*", "KAFKA_*"]
+  iac: [aws_msk_cluster]
+
+rabbitmq:
+  label: RabbitMQ
+  probe: message_broker
+  deps: ["org.springframework.boot:spring-boot-starter-amqp", amqplib, pika]
+  imports: [org.springframework.amqp, amqplib, "import pika"]
+  config: ["spring.rabbitmq.*", "RABBITMQ_*"]
+  iac: [aws_mq_broker]
+
+sqs:
+  label: AWS SQS
+  probe: message_broker
+  deps: ["software.amazon.awssdk:sqs", "@aws-sdk/client-sqs"]
+  imports: [software.amazon.awssdk.services.sqs, SqsClient, "@aws-sdk/client-sqs"]
+  config: ["*sqs*queue*", "SQS_*"]
+  iac: [aws_sqs_queue, "AWS::SQS::Queue"]
+  permissions:
+    read: ["sqs:ReceiveMessage"]
+    write: ["sqs:SendMessage"]
+    delete: ["sqs:DeleteMessage"]
+
+sns:
+  label: AWS SNS
+  probe: push_messaging
+  deps: ["software.amazon.awssdk:sns", "@aws-sdk/client-sns"]
+  imports: [software.amazon.awssdk.services.sns, SnsClient, "@aws-sdk/client-sns"]
+  config: ["*sns*topic*", "SNS_*"]
+  iac: [aws_sns_topic]
+
+dynamodb:
+  label: AWS DynamoDB
+  probe: key_value
+  deps: ["software.amazon.awssdk:dynamodb", "@aws-sdk/client-dynamodb"]
+  imports: [software.amazon.awssdk.services.dynamodb, DynamoDbClient, "@aws-sdk/client-dynamodb"]
+  config: ["*dynamodb*table*", "DYNAMODB_*"]
+  iac: [aws_dynamodb_table, "AWS::DynamoDB::Table"]
+  permissions:
+    read: ["dynamodb:GetItem", "dynamodb:Query"]
+    write: ["dynamodb:PutItem"]
+    delete: ["dynamodb:DeleteItem"]
+
+secretsmanager:
+  label: AWS Secrets Manager
+  probe: secret_store
+  deps: ["software.amazon.awssdk:secretsmanager", "@aws-sdk/client-secrets-manager"]
+  imports: [software.amazon.awssdk.services.secretsmanager, SecretsManagerClient]
+  config: ["*secret*name*", "*SECRET_NAME*"]
+  iac: [aws_secretsmanager_secret]
+  permissions:
+    read: ["secretsmanager:GetSecretValue"]
+
+elasticsearch:
+  label: Elasticsearch / OpenSearch
+  probe: search_index
+  deps: ["co.elastic.clients:elasticsearch-java", "org.opensearch.client:opensearch-java", "@elastic/elasticsearch", elasticsearch]
+  imports: [co.elastic.clients, org.opensearch.client, "@elastic/elasticsearch"]
+  config: ["*elasticsearch*", "OPENSEARCH_*", "ELASTIC_*"]
+  iac: [aws_opensearch_domain, aws_elasticsearch_domain]
+
+stripe:
+  label: Stripe payments
+  probe: http_dependency
+  deps: ["com.stripe:stripe-java", stripe]
+  imports: [com.stripe, "require('stripe')", "import stripe"]
+  config: ["stripe.*", "STRIPE_*"]
+  health_url: https://api.stripe.com
+
+twilio:
+  label: Twilio messaging
+  probe: http_dependency
+  deps: ["com.twilio.sdk:twilio", twilio]
+  imports: [com.twilio, "require('twilio')", "from twilio"]
+  config: ["twilio.*", "TWILIO_*"]
+  health_url: https://api.twilio.com
+
+sendgrid:
+  label: SendGrid email
+  probe: http_dependency
+  deps: ["com.sendgrid:sendgrid-java", "@sendgrid/mail", sendgrid]
+  imports: [com.sendgrid, "@sendgrid/mail"]
+  config: ["*sendgrid*", "SENDGRID_*"]
+  health_url: https://api.sendgrid.com
+
+smtp:
+  label: SMTP email
+  probe: smtp
+  deps: ["org.springframework.boot:spring-boot-starter-mail", nodemailer]
+  imports: [org.springframework.mail, jakarta.mail, nodemailer, smtplib]
+  config: ["spring.mail.*", "MAIL_HOST*", "SMTP_*"]
+
+oauth_google:
+  label: Google OAuth / identity
+  probe: http_dependency
+  deps: ["com.google.api-client:google-api-client", google-auth-library]
+  imports: [com.google.api.client.googleapis.auth, GoogleIdTokenVerifier]
+  config: ["*oauth*google*", "GOOGLE_CLIENT_ID*"]
+  health_url: https://oauth2.googleapis.com

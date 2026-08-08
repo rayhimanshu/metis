@@ -1,0 +1,87 @@
+# Probe families, keyed by the generic `probe` value in capabilities.yaml.
+# Nothing here names a vendor.
+#
+# `depth` answers the honest question: how much should a health endpoint
+# actually *do*?
+#
+#   deep         a real round trip that mutates and cleans up. Only where the
+#                round trip is cheap, inside your own account, and the only way
+#                to prove the permission works.
+#   light        one cheap read. Proves connectivity without side effects.
+#   config_only  no network call. Reports whether the integration is configured.
+#
+# `config_only` is not laziness. A health check that calls Stripe or Twilio on
+# every request turns someone else's rate limit into your outage, and makes your
+# service report DOWN when a third party blips. You cannot fix a vendor by
+# restarting a container, so reporting it as a failure is actively misleading.
+#
+# `legs` gate on IAM verbs discovered from infrastructure-as-code. A leg whose
+# verb is not granted is never generated -- that is how discovered permissions
+# bound behaviour instead of merely describing it.
+
+object_store:
+  depth: deep
+  rationale: >
+    A write-read-delete round trip on a probe key is the only check that proves
+    write permission. Reads alone keep succeeding long after uploads break.
+  legs:
+    - {name: write, verb: write, required: true}
+    - {name: read, verb: read, required: true}
+    - {name: delete, verb: delete, required: false}
+  key_prefix: health-check
+
+relational:
+  depth: light
+  rationale: A validation query proves the pool hands out a live connection.
+  legs:
+    - {name: query, verb: read, required: true}
+
+document_store:
+  depth: deep
+  rationale: Upsert of a single probe document, then read it back.
+  legs:
+    - {name: write, verb: write, required: true}
+    - {name: read, verb: read, required: true}
+  collection: _health_checks
+
+key_value:
+  depth: light
+  legs:
+    - {name: read, verb: read, required: true}
+
+secret_store:
+  depth: light
+  rationale: >
+    Confirms a secret resolves. The value never enters the response -- a health
+    endpoint must not become a way to read secrets.
+  legs:
+    - {name: resolve, verb: read, required: true}
+  redact: true
+
+message_broker:
+  depth: light
+  legs:
+    - {name: metadata, verb: read, required: true}
+
+search_index:
+  depth: light
+  legs:
+    - {name: ping, verb: read, required: true}
+
+push_messaging:
+  depth: config_only
+  rationale: >
+    There is no free no-op send. Delivery cannot be proven without actually
+    messaging a device, so report configuration state instead.
+
+http_dependency:
+  depth: config_only
+  rationale: >
+    A third-party API. Polling it from a health check adds load, risks rate
+    limits, and makes their outage read as ours.
+
+smtp:
+  depth: config_only
+  rationale: >
+    Opening an SMTP session per health check is expensive and trips provider
+    abuse heuristics.

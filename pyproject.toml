@@ -1,0 +1,58 @@
+[project]
+name = "metis-agents"
+version = "0.1.0"
+description = "A substrate for autonomous engineering agents: discovery, a shared bus, and safety rails."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Himanshu Ray", email = "jackofalltradesray@gmail.com" }]
+keywords = ["agents", "claude", "automation", "devops", "discovery"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "pyyaml>=6.0",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "build>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/rayhimanshu/metis"
+Repository = "https://github.com/rayhimanshu/metis"
+Issues = "https://github.com/rayhimanshu/metis/issues"
+
+[project.scripts]
+metis = "metis.cli:main"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["metis*"]
+
+# Without this the wheel ships only .py files, and an installed Metis crashes on
+# first use: the schema, the capability signatures, and the probe families are
+# all loaded relative to __file__. An editable install hides the problem
+# completely, because it reads straight from the source tree.
+[tool.setuptools.package-data]
+metis = [
+    "bus/*.sql",
+    "discovery/*.yaml",
+    "policy/*.yaml",
+    "roles/*.md",
+    "hooks/*.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

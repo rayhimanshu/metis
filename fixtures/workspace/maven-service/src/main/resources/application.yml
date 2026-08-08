@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/demodb
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:hunter2}
+aws:
+  s3:
+    images-bucket: ${AWS_S3_IMAGES_BUCKET:demo-images-local}
+firebase:
+  service-account:
+    path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}

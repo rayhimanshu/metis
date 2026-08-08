@@ -1,0 +1,17 @@
+name: Deploy
+on:
+  push:
+    branches: [main]
+env:
+  AWS_REGION: eu-west-1
+  ECR_REPOSITORY: demo-maven-service
+  ECS_CLUSTER: demo-cluster
+  ECS_SERVICE: demo-maven-service
+  CONTAINER_NAME: maven-service
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./mvnw verify -B
+      - uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with: { service: demo-maven-service, cluster: demo-cluster }
