@@ -30,7 +30,7 @@ Each agent:
 - Posts typed events to the ledger: `code_ready`, `build_passed`, `deploy_started`, `test_failed`, etc.
 - Awaits or tails events from other agents to react
 
-The ledger provides **eventual consistency** within a single run: all agents see the same causal history. It enforces **serializability** for resource access: two agents never hold conflicting leases. It tracks **ground truth** separately from testimony: what the OS witnessed (hooks) vs. what agents claim.
+Writes are **serialized** — every mutation goes through `BEGIN IMMEDIATE`, so leases and events have one total order and two agents can never hold conflicting locks. Reads are **catch-up**: each agent keeps a cursor, so an agent that was not running when something happened reads it on return rather than missing it. And **ground truth is kept apart from testimony**: what the harness observed (hooks) versus what an agent claims it did.
 
 Work arrives from Jira or Trello. The agents ingest it, implement it, build, test, deploy, and self-repair on failure. Nothing orchestrates them. A deterministic substrate gives them shared memory, communication primitives, and safety enforcement that cannot be bypassed by a prompt.
 
@@ -150,17 +150,17 @@ metis watch
 
 Streams the event log as it grows. Lets you see every decision.
 
-**Terminal 2 — the Coder:**
+**Terminal 2 — SWE:**
 ```bash
 METIS_ROLE=swe claude
 ```
 
-**Terminal 3 — the Builder:**
+**Terminal 3 — DevOps:**
 ```bash
 METIS_ROLE=devops claude
 ```
 
-**Terminal 4 — the Tester:**
+**Terminal 4 — Tester:**
 ```bash
 METIS_ROLE=tester claude
 ```
@@ -183,10 +183,10 @@ Copies the prompts to your project. Project copies win over packaged ones.
 
 ### Multi-repository workspaces
 
-The workspace is your scope. Point it at one repo, or at a parent holding several:
+The workspace is your scope. Point it at one repo, or at a parent holding several — `metis setup` asks for the workspace directory, so run it from the parent:
 
 ```bash
-metis setup --workspace ~/projects/my-platform
+cd ~/projects/my-platform && metis setup
 ```
 
 Discovery treats each git root as its own target with its own lock. Agents can work on different repositories simultaneously — never on the same one at the same time.
@@ -227,17 +227,28 @@ Accepts a git URL just as well. Scans the repo and produces:
 | + a config key names a concrete resource | Even stronger. |
 | + IaC creates it and grants permissions | Definitive. The platform agrees. |
 
-A result like this is typical:
+Real output — `+` is an actionable capability, `~` is a derived lock key:
 
 ```
-✓ redis [high]      declared + imported + configured
-  └ used in cache layer, config has REDIS_HOST set
+source      /path/to/platform  (local)
+targets     6  languages: java, javascript, python
+deployable  maven-service   local-only: gradle-service, node-pnpm, python-suite
+LB polls    /actuator/health   (deep probes must not attach here)
 
-skip postgres [medium]  declared, configured, but no source import
-  └ dependency present, config ready, code doesn't exercise it
-  
-skip dynamodb [low]  imported in test fixtures only
-  └ strong signal but test-only, won't load in production
+  maven-service  [java_maven]  deploy=aws_ecs {'cluster': 'demo-cluster', ...}
+      + postgres        relational
+      + s3              object_store    perms=read,write,delete,list
+      ~ build  needs worktree:platform@main
+      ~ deploy needs branch:platform@main, cluster:demo-cluster, schema:demodb
+      ~ covered by:     python-suite
+```
+
+What it declines is reported too, with the reason it fell short:
+
+```
+skipped (reported, not acted on):
+  - maven-service/firestore [medium] declared and configured, but no main-source
+    usage found -- the dependency is present without evidence the code exercises it
 ```
 
 That rule — **decline what you cannot justify** — is what makes unattended operation defensible. No guessing. No wishful thinking. IaC never creates a finding on its own; it enriches one. Permissions are bounds: an agent granted `s3:GetObject` gets a read-only probe, not a write that was always going to fail.
@@ -253,8 +264,8 @@ metis claim worktree:api@main --ttl 900
 # Record an event
 metis post --type code_ready --target api --rationale "renamed the schema"
 
-# Wait for an event matching a pattern
-metis await --type build_passed --target api --timeout 600
+# Block until one of these event types appears
+metis await --for build_passed,build_failed --timeout 600
 
 # Stream all events
 metis tail --agent swe
@@ -325,10 +336,10 @@ metis report --out run.md  # timeline of every decision, every pause, every faul
 
 Two tiers of evidence, kept strictly apart:
 
-- **Ground truth** — commands that ran, files that changed, leases acquired and released. Written by hooks. Cannot be faked because they're hooks into the OS.
-- **Testimony** — what an agent *claims* it did, why it stopped, what it tried. Written by agents. Useful but fallible.
+- **Ground truth** — commands that ran, files that changed, leases acquired and released. Written by hooks as the tool call happens, so an agent cannot author, omit, or edit them.
+- **Testimony** — what an agent *claims* it did, why it stopped, what it tried. Written by agents. Useful, and fallible.
 
-When they disagree, believe the hooks. A hook says "your test ran and failed" is stronger than an agent saying "the test passed".
+When they disagree, believe the hooks. "The command ran and exited 1" outranks "the tests passed".
 
 Every event carries a `caused_by` field — the event that triggered it. Follow the chain backward and you see the decision tree. Follow it forward and you see the ripples. No guessing. No lost time wondering what happened and why.
 
@@ -352,16 +363,16 @@ metis/
     ├── iac.py              parse Terraform, CloudFormation, AWS CDK
     ├── deployment.py       find orchestration (ECS, K8s, Lambda, etc.)
     ├── testing.py          map tests to targets, discover coverage
-    └── detectors/          per-language plugins for build/test commands
+    └── detectors/          java_maven, java_gradle, node, python
 
   intake/
     ├── jira.py             fetch, comment, transition in Jira
     ├── trello.py           fetch, comment, move in Trello
     └── sync.py             pull issues as requirements, push events as comments
 
-  hooks/                     Pre/Post tool-use enforcement
-    ├── __init__.py         dispatch, role-based checks
-    └── pre_tool_use.py     refusals before a tool runs (safety)
+  hooks/
+    ├── __init__.py             PreToolUse refusals, PostToolUse ground truth
+    └── settings.template.json  the hook wiring metis install-hooks merges
 
   enforcement.py             what each role may write and run
   secrets.py                 OS keychain-backed, never logged
@@ -379,4 +390,4 @@ metis/
 pytest -q
 ```
 
-210+ tests covering all modules, running against synthetic fixtures. Designed to run anywhere with no external services, no network, no secrets.
+227 tests, run against synthetic fixtures in `fixtures/`. No external services, no network, no credentials -- they run anywhere, including CI on a fresh clone.
