@@ -8,7 +8,7 @@
 <h1 align="center">Metis</h1>
 
 <p align="center">
-  <em>Three autonomous agents. One shared truth. No manager.</em>
+  <em>Distributed coordination for autonomous AI agents via append-only event ledger and lease-based mutual exclusion.</em>
 </p>
 
 <p align="center">
@@ -19,15 +19,20 @@
 
 </p>
 
-### Three agents work, without a manager
+### Substrate, not orchestrator
 
-A **Coder** writes features. A **Builder** deploys them. A **Tester** verifies they work — and catches what breaks.
+Three autonomous Claude agents — **SWE**, **DevOps**, **Tester** — operate independently on the same codebase, coordinated through an append-only SQLite ledger. No central orchestrator. No message broker. No state consensus algorithm.
 
-Each runs as a Claude session in its own terminal, thinking independently. But they share one ledger of what has happened. That ledger is dumb: it only records. It doesn't decide. It doesn't judge. But it sees everything, and it enforces the rules.
+Each agent:
+- Runs as a separate Claude session in its own terminal
+- Reasons, acts, observes, and retries independently
+- Claims exclusive leases (with TTL, all-or-nothing, sorted acquisition) before mutating shared resources
+- Posts typed events to the ledger: `code_ready`, `build_passed`, `deploy_started`, `test_failed`, etc.
+- Awaits or tails events from other agents to react
 
-Work arrives from an issue tracker. The agents pick it up, implement it, build, deploy, verify, and repair their own regressions. Nothing tells them what to do; a small piece of deterministic infrastructure gives them a way to talk, a shared memory, and safety rails so precise that two of them cannot break the same thing at once.
+The ledger provides **eventual consistency** within a single run: all agents see the same causal history. It enforces **serializability** for resource access: two agents never hold conflicting leases. It tracks **ground truth** separately from testimony: what the OS witnessed (hooks) vs. what agents claim.
 
-The system knows nothing about your language, your cloud, or your services. It learns from your code.
+Work arrives from Jira or Trello. The agents ingest it, implement it, build, test, deploy, and self-repair on failure. Nothing orchestrates them. A deterministic substrate gives them shared memory, communication primitives, and safety enforcement that cannot be bypassed by a prompt.
 
 | | |
 |---|---|
