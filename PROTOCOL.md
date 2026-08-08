@@ -154,6 +154,41 @@ contention graph from facts it already collected.
 and `env:dev` and `env:staging` are different keys — two concurrent test runs,
 no code change.
 
+### Change sets
+
+One feature routinely spans repositories — a contract change touching both the
+producer and its consumers, a shared type, a renamed field. **Those repositories
+must be changed in one context: same intent, same identity, built together,
+pushed together or not at all, rolled back together.**
+
+Without something holding them together, each repository is an independent
+change that can land on its own. A change set is that container.
+
+```bash
+metis changeset new --targets service-a,service-b --reason "rename the user id field"
+```
+
+Two things follow. A **commit trailer** (`Metis-Change-Id: <run>/cs-<n>`) gives
+the feature one identity across every repository it touches, so months later the
+pieces are findable as one change. And a **push gate**:
+
+> No repository in a set may be pushed until every repository in that set has
+> built.
+
+Enforced by the pre-tool hook rather than requested in a prompt, because it is
+exactly the rule an agent under pressure to ship half a change would reason its
+way around. Without it, repo A lands, repo B's build fails, and production holds
+two services disagreeing about a contract with nothing recording that they were
+meant to go together.
+
+The gate **fails closed**. Events count toward a set only when tagged with it
+(`metis post --change-set`, or `METIS_CHANGE_SET`). An untagged build leaves the
+set blocked, which is recoverable — tag it and rebuild. Letting untagged builds
+satisfy a set would be the exact false positive the gate exists to prevent.
+
+`metis changeset rollback-plan <id>` emits a per-repository reset covering the
+whole set. Emitted, never executed.
+
 ### Rules
 
 - An agent may act only while holding **every** key its action declares.

@@ -39,10 +39,27 @@ class Store:
 
     # ------------------------------------------------------------ lifecycle
 
+    # Columns added after the first release. `CREATE TABLE IF NOT EXISTS` will
+    # not alter a table that already exists, so an existing bus needs these
+    # applied explicitly or it breaks on the first query that mentions them.
+    MIGRATIONS: list[tuple[str, str]] = [
+        ("events", "change_set TEXT"),
+    ]
+
     def initialize(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+            self._migrate(conn)
+
+    def _migrate(self, conn: sqlite3.Connection) -> None:
+        for table, definition in self.MIGRATIONS:
+            column = definition.split()[0]
+            existing = {
+                row["name"] for row in conn.execute(f"PRAGMA table_info({table})")
+            }
+            if column not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
 
     def exists(self) -> bool:
         return self.path.is_file()

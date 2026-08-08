@@ -55,8 +55,30 @@ def run_pre(payload: dict[str, Any]) -> int:
         cfg, workspace = None, Path(payload.get("cwd") or ".").resolve()
 
     if tool in COMMAND_TOOLS:
-        allowed, reason = check_command(role, str(tool_input.get("command") or ""))
-        return 0 if allowed else _deny(reason)
+        command = str(tool_input.get("command") or "")
+        allowed, reason = check_command(role, command)
+        if not allowed:
+            return _deny(reason)
+
+        # A push may be legal for this role and still wrong right now, if the
+        # repository belongs to a change set whose siblings have not built.
+        if cfg is not None:
+            try:
+                from ..bus.store import Store
+                from ..enforcement import check_changeset_push
+
+                store = Store(cfg.bus_path())
+                if store.exists():
+                    run = store.latest_run()
+                    if run:
+                        ok, why = check_changeset_push(
+                            store, run["id"], command, payload.get("cwd") or str(workspace)
+                        )
+                        if not ok:
+                            return _deny(why)
+            except Exception:
+                pass
+        return 0
 
     if tool in WRITE_TOOLS:
         path = tool_input.get("file_path") or tool_input.get("notebook_path") or ""

@@ -98,6 +98,7 @@ def cmd_post(args: argparse.Namespace) -> int:
         caused_by=args.caused_by,
         session_id=args.session_id or os.environ.get("METIS_SESSION_ID"),
         rationale=args.rationale,
+        change_set=args.change_set or os.environ.get("METIS_CHANGE_SET"),
         secret_names=cfg.secret_names(),
         allow_human_only=args.i_am_human,
     )
@@ -310,6 +311,9 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--caused-by", type=int, help="the event that triggered this")
     p.add_argument("--rationale", help="one line: why")
     p.add_argument("--session-id")
+    p.add_argument("--change-set",
+                   help="tag this event as part of a cross-repo change set "
+                        "(or set METIS_CHANGE_SET)")
     p.add_argument("--agent")
     p.add_argument("--run", **common_run)
     p.add_argument("--i-am-human", action="store_true",

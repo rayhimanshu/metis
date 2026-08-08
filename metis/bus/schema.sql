@@ -36,7 +36,10 @@ CREATE TABLE IF NOT EXISTS events (
     tier        TEXT    NOT NULL DEFAULT 'testimony',   -- ground_truth | testimony
     caused_by   INTEGER REFERENCES events(id),
     session_id  TEXT,
-    rationale   TEXT
+    rationale   TEXT,
+
+    -- Set when this event belongs to a change spanning repositories.
+    change_set  TEXT REFERENCES changesets(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_run_id     ON events(run_id, id);
@@ -93,3 +96,22 @@ CREATE TABLE IF NOT EXISTS artifacts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_event ON artifacts(event_id);
+
+-- A change that spans repositories.
+--
+-- Git cannot produce one commit across two repositories, so a cross-repo change
+-- is N commits that must be findable together and, more importantly, must not
+-- be pushed piecemeal. Repo A landing while repo B fails leaves a contract
+-- mismatch in production with nothing recording that the two were meant to go
+-- together.
+CREATE TABLE IF NOT EXISTS changesets (
+    id          TEXT PRIMARY KEY,       -- <run_id>/cs-<n>
+    run_id      TEXT NOT NULL REFERENCES runs(id),
+    targets     TEXT NOT NULL,          -- JSON array, sorted
+    reason      TEXT,
+    created_by  TEXT NOT NULL,
+    created_at  TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'OPEN'   -- OPEN | BUILT | PUSHED | ABANDONED
+);
+
+CREATE INDEX IF NOT EXISTS idx_changesets_run ON changesets(run_id, status);
