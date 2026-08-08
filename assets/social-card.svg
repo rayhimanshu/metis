@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="Metis — a substrate for autonomous engineering agents">
+  <rect width="1280" height="640" fill="#F8F9FA"/>
+
+  <!-- Mark, scaled from the 32-unit grid -->
+  <g transform="translate(150 190) scale(8)">
+    <g fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 11.24 8.25 L 16.0 5.5 L 23.79 10.0 L 19.03 12.75" stroke="#111827"/>
+      <path d="M 25.09 15.75 L 25.09 21.25 L 17.30 25.75 L 17.30 20.25" stroke="#111827"/>
+      <path d="M 11.67 24.00 L 6.91 21.25 L 6.91 12.25 L 11.67 15.00" stroke="#E63946"/>
+    </g>
+  </g>
+
+  <g font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="470" y="290" fill="#111827" font-size="104" font-weight="700" letter-spacing="-2">metis</text>
+    <text x="472" y="352" fill="#4B5563" font-size="34" font-weight="500">A substrate for autonomous engineering agents</text>
+    <!-- Social cards get cropped by every platform that shows them, so nothing
+         sits closer than ~90px to an edge. -->
+    <text x="472" y="410" fill="#6B7280" font-size="25">Evidence over guesswork · a shared bus · rails that refuse</text>
+  </g>
+
+  <rect x="472" y="450" width="76" height="5" fill="#E63946"/>
+</svg>
