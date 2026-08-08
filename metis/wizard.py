@@ -130,6 +130,10 @@ def render_config(values: dict[str, Any]) -> str:
             f"    list_name: {values['trello_list']}",
             f"    poll_seconds: {values['poll_seconds']}",
         ]
+        # Trello has no workflow states, so a "transition" is a card moving to
+        # another list. Both lists must already exist on the board.
+        if values.get("trello_on_start"):
+            lines.append(f"    on_start: {values['trello_on_start']}")
         if values.get("trello_on_done"):
             lines.append(f"    on_done: {values['trello_on_done']}")
 
@@ -201,7 +205,9 @@ def collect(ask: Asker, existing: Config | None, interactive: bool = True) -> di
         values["trello_board"] = ask("  Trello board id", settings.get("board_id"))
         values["trello_list"] = ask("  List to pull cards from",
                                     settings.get("list_name") or "Ready for Dev")
-        values["trello_on_done"] = ask("  Move cards to this list when tests pass (blank to skip)",
+        values["trello_on_start"] = ask("  Move cards to this list when picked up (blank to skip)",
+                                        settings.get("on_start") or "In Progress")
+        values["trello_on_done"] = ask("  ...and this one when tests pass (blank to skip)",
                                        settings.get("on_done") or "Done")
         values["poll_seconds"] = ask("  Poll interval, seconds",
                                      str(settings.get("poll_seconds", 120)))
