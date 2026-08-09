@@ -138,7 +138,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
         _, targets, _ = pipeline.discover(str(cfg.workspace), environment=cfg.environment)
         kinds = [(t_.deployment or {}).get("kind") for t_ in targets]
-        gaps = tooling.report([k for k in kinds if k], list(cfg.intake or []) )
+
+        # Clouds come from what IaC provisions, not from cfg.intake -- that
+        # holds trackers, and passing it here meant the provider check never
+        # fired at all.
+        from .discovery import iac
+
+        index = iac.build_index(cfg.workspace)
+        providers = tooling.providers_from_iac(index.resources)
+
+        gaps = tooling.report([k for k in kinds if k], providers)
     except Exception:
         gaps = []
 
