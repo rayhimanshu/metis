@@ -257,3 +257,57 @@ def test_messages_are_read_once(store):
     assert len(ev.inbox(store, RUN, "swe")) == 1
     assert ev.inbox(store, RUN, "swe") == []
     assert len(ev.inbox(store, RUN, "swe", unread_only=False)) == 1
+
+
+# ------------------------------------------------- an empty file is not a bus
+
+
+def test_a_zero_byte_file_is_not_an_initialised_bus(tmp_path):
+    """SQLite creates an empty file on first connect.
+
+    A command that read before anything was written left one behind, and
+    `exists()` then reported a working bus to everyone who asked. The symptom
+    was `metis watch` crashing on a missing `runs` table -- having created the
+    file it crashed on.
+    """
+    path = tmp_path / "bus.db"
+    path.touch()
+
+    assert path.is_file()
+    assert not Store(path).exists()
+
+
+def test_a_file_of_junk_is_not_a_bus(tmp_path):
+    path = tmp_path / "bus.db"
+    path.write_bytes(b"this is not a database")
+
+    assert not Store(path).exists()
+
+
+def test_an_initialised_bus_is_recognised(tmp_path):
+    store = Store(tmp_path / "bus.db")
+    store.initialize()
+
+    assert store.exists()
+
+
+def test_resolving_a_run_without_a_bus_explains_itself(tmp_path):
+    """A traceback about a missing table tells you nothing you can act on."""
+    path = tmp_path / "bus.db"
+    path.touch()
+
+    with pytest.raises(BusError) as caught:
+        Store(path).resolve_run(None)
+
+    message = str(caught.value)
+    assert "nothing has started here yet" in message
+    assert "metis work" in message
+
+
+def test_reading_an_absent_bus_does_not_leave_one_behind(tmp_path):
+    """Asking a question should not create the thing being asked about."""
+    path = tmp_path / "bus.db"
+    store = Store(path)
+
+    assert not store.exists()
+    assert not path.exists() or path.stat().st_size == 0
