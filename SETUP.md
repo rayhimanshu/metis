@@ -250,12 +250,12 @@ stop the work.
 ### Before trusting either tracker
 
 ```bash
-metis intake --dry-run
+metis work --list
 ```
 
-Shows exactly which issues would become `requirement` events, and flags any
-whose text reads like instructions rather than a description. Writes nothing,
-moves nothing.
+Shows exactly what Metis can see on your board, and flags any issue whose text
+reads like instructions rather than a description. Writes nothing, moves
+nothing -- looking is always free.
 
 ---
 
@@ -316,13 +316,50 @@ metis doctor
 Reports config, workspace, agents, integrations, and — once a run exists — its
 health. Add `--verify` to make live calls to your tracker.
 
+### Picking up work
+
+```bash
+metis work
+```
+
+Fetches what is ready on your tracker, shows anything already in flight, and
+lets you choose what to start. Taking one posts a `requirement` event and moves
+that card to your in-progress list.
+
+It starts a run if there is not one already, so nothing has to be named up
+front.
+
+Without a tracker, hand the agents a requirement directly:
+
 ```bash
 metis init-run --requirement "Add a health-check endpoint"
 ```
 
+Then open a session per agent:
+
 ```bash
 METIS_ROLE=swe claude
 ```
+
+At any point, ask what is happening:
+
+```bash
+metis
+```
+
+That reads the local ledger -- what is in flight, what finished, who holds a
+lease. No network, so it answers instantly.
+
+To keep the queue fed without being asked:
+
+```bash
+metis work --auto
+```
+
+It **feeds work in; it does not run agents.** Your sessions stay sessions you
+can watch and interrupt. It also stops handing out new work while any task
+needs a human, because burying that under three more is how unattended systems
+fail quietly.
 
 There is **no bus process to start**. The bus is a SQLite file at
 `.metis/bus.db`; there is no daemon.
