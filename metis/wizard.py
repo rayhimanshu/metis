@@ -56,7 +56,18 @@ def _prompt(question: str, default: str | None = None) -> str:
 
     suffix = f" [{default}]" if default else ""
     sys.stdout.flush()
-    answer = input(f"{question}{suffix}: ").strip()
+    try:
+        answer = input(f"{question}{suffix}: ").strip()
+    except EOFError:
+        # Input ran out. Every question here has a default that works, and the
+        # wizard's promise is that pressing enter throughout produces a working
+        # configuration -- so exhausted input should mean the same thing.
+        #
+        # It was not: a smoke test piping a fixed number of newlines crashed the
+        # moment a question was added, which made the count of questions part of
+        # the contract by accident.
+        print()
+        return default or ""
     return answer or (default or "")
 
 
