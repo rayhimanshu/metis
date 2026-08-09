@@ -109,8 +109,27 @@ def _strip_metis(settings: dict) -> tuple[dict, int]:
     return settings, removed
 
 
+def _target(args: argparse.Namespace) -> Path:
+    """Where the hooks belong.
+
+    The configured workspace, not the current directory. Agents run in the
+    workspace, and Claude Code reads `.claude/settings.json` from wherever the
+    session started -- so hooks installed anywhere else are simply never read.
+    Every other command already resolves the workspace this way; this one was
+    the odd one out, and quietly wiring up whichever directory you happened to
+    be standing in is a poor way to find that out.
+    """
+    if args.project:
+        return Path(args.project).expanduser().resolve()
+    try:
+        cfg = load(Path(args.config) if getattr(args, "config", None) else None)
+        return Path(cfg.workspace).expanduser().resolve()
+    except Exception:
+        return Path.cwd()
+
+
 def cmd_install_hooks(args: argparse.Namespace) -> int:
-    project = Path(args.project or ".").expanduser().resolve()
+    project = _target(args)
     if not project.is_dir():
         print(f"not a directory: {project}", file=sys.stderr)
         return 2
@@ -243,7 +262,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.set_defaults(func=cmd_hook)
 
     p = sub.add_parser("install-hooks", help="wire Metis hooks into a project's Claude settings")
-    p.add_argument("project", nargs="?", help="defaults to the current directory")
+    p.add_argument("project", nargs="?",
+                   help="defaults to the workspace in metis.yaml")
     p.add_argument("--dry-run", action="store_true", help="print the merged settings")
     p.add_argument("--force", action="store_true", help="proceed even if metis is not on PATH")
     p.add_argument("--remove", action="store_true",

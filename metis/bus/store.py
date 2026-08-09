@@ -62,7 +62,28 @@ class Store:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {definition}")
 
     def exists(self) -> bool:
-        return self.path.is_file()
+        """Is there an initialised bus here?
+
+        Not merely "is there a file". SQLite creates an empty one on the first
+        connection, so a command that reads before anything has been written
+        leaves a 0-byte file behind -- which then looks like a bus to every
+        caller that asks, and answers no question put to it. The failure that
+        produced this check was `metis watch` creating the file it then crashed
+        on, with a raw traceback about a missing `runs` table.
+        """
+        try:
+            if not self.path.is_file() or self.path.stat().st_size == 0:
+                return False
+        except OSError:
+            return False
+
+        try:
+            with self.read() as conn:
+                return conn.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'runs'"
+                ).fetchone() is not None
+        except sqlite3.DatabaseError:
+            return False
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.path, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None)
@@ -125,6 +146,11 @@ class Store:
             ).fetchone()
 
     def resolve_run(self, run_id: str | None) -> sqlite3.Row:
+        if not self.exists():
+            raise BusError(
+                f"no bus at {self.path} -- nothing has started here yet. "
+                "Run `metis work` to pick something up, or `metis init-run`."
+            )
         run = self.get_run(run_id) if run_id else self.latest_run()
         if not run:
             raise BusError(
