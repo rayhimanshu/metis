@@ -451,6 +451,33 @@ sessions stay sessions you can watch and interrupt. And it stops handing out
 new work the moment a task halts, because burying the thing that needs a human
 under three more is how unattended systems fail quietly.
 
+### Cloud credentials are checked, never stored
+
+```bash
+metis setup aws     # or gcp, azure, alicloud
+```
+
+```
+Checking AWS
+Metis stores no cloud credentials. Your CLI already resolves them
+through SSO, assumed roles, or instance metadata, and DevOps runs
+that CLI directly.
+
+  ok  account 111122223333, region eu-west-1 as deployer
+
+DevOps will deploy as this identity. Check it is the one you meant.
+```
+
+Nothing is asked for and nothing is written. Your cloud CLI already resolves
+credentials through SSO sessions, assumed roles, and instance metadata — all
+short-lived and rotating. Pasting a static access key so Metis could keep a
+second copy would swap that for a long-lived secret and call it convenience.
+
+What this catches is the silent case: **DevOps cannot deploy and nothing says
+so** until a deploy fails halfway through. `metis doctor --verify` checks every
+provider, and reports the identity rather than just a tick — a failing deploy is
+far more often the wrong role than a missing credential.
+
 ## Intake — from issue tracker to work
 
 ```bash
