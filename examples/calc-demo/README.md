@@ -7,7 +7,7 @@ Requires `metis` on PATH — the hooks invoke `metis hook pre`, so without it th
 safety rails silently never fire:
 
 ```bash
-uv tool install git+https://github.com/rayhimanshu/metis.git
+pipx install git+https://github.com/rayhimanshu/metis.git
 ```
 
 ## Setup
@@ -24,15 +24,30 @@ cp -r examples/calc-demo ~/calc-demo && cd ~/calc-demo
 ./setup.sh
 ```
 
-That builds the venv, installs the hooks, and creates a run with this
+That builds the venv, installs the hooks, and starts a run with this
 requirement:
 
 > Add a `divide(a, b)` function to the calc package. It must raise `ValueError`
 > with a clear message when `b` is zero. Cover it with tests.
 
+Ask what is happening at any point:
+
+```bash
+metis
+```
+
+That reads the local ledger and prints the run, what is in flight, what
+finished, and who holds a lease. No network, so it answers instantly.
+
 **There is no bus process to start.** The bus is a SQLite file at
 `.metis/bus.db` — no daemon, nothing to launch. What earns a terminal is the
 live view.
+
+> This demo hands the agents a requirement directly, because it has no issue
+> tracker attached. On a real project you would connect Jira or Trello and use
+> **`metis work`** to see what is ready and pick something up — or
+> `metis work --auto` to keep the queue fed without being asked. See the
+> [main README](../../README.md#picking-up-work).
 
 Open four terminals, all in this directory.
 
@@ -98,7 +113,8 @@ METIS_ROLE=tester claude
    `build_failed` **with a fault slice, not the whole log**
 3. On failure SWE wakes with the slice and repairs; on success Tester runs the
    suite and posts `test_passed`
-4. Terminal 1 shows every step as it lands
+4. Terminal 1 shows every step as it lands, and `metis` in any other terminal
+   gives you the same picture as a snapshot
 
 Notice that the handoff works because SWE *releases* the worktree before
 posting. Holding a lease across a handoff is the classic way two correct agents

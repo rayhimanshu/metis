@@ -246,3 +246,20 @@ def test_a_task_with_no_target_says_so_rather_than_lying(store, cfg, source):
     assert task.target is None
     assert task.state == work.UNTRACKED
     assert "cannot be followed" in task.detail
+
+
+def test_a_single_target_workspace_attributes_the_seed_requirement(store, cfg, source):
+    """`init-run` on a one-target repo must not produce an untrackable task.
+
+    The demo hit this: its own requirement rendered as "untracked -- progress
+    cannot be followed", which is a poor first thing for a new user to read and
+    is avoidable, since with one target there is nothing to guess between.
+    """
+    ev.post(store, RUN, "requirement", agent="human", target="calc-demo",
+            payload="Add divide()", rationale="run started")
+    ev.post(store, RUN, "code_ready", agent="swe", target="calc-demo")
+
+    task = work.in_flight(store, RUN)[0]
+    assert task.state == work.WAITING
+    assert task.source == "local"
+    assert task.title == "Add divide()"
