@@ -148,7 +148,7 @@ def test_preflight_failure_stops_before_anything_launches(project, monkeypatch, 
 
     code = start.cmd_start(argparse.Namespace(
         config=str(cfg.path), session="x", replace=False, no_attach=True,
-        force=False, tmux=True, print=False))
+        force=False, tmux=True, print=False, ask=False))
 
     assert code == 1
     assert launched == [], "nothing should be started when the run cannot work"
@@ -175,7 +175,7 @@ def test_every_agent_gets_a_pane_with_its_role(project, monkeypatch):
 
     start.cmd_start(argparse.Namespace(
         config=str(cfg.path), session="t", replace=False, no_attach=True,
-        force=False, tmux=True, print=False))
+        force=False, tmux=True, print=False, ask=False))
 
     build = next(c for c in calls if "new-session" in c)
     joined = " ".join(build)
@@ -203,7 +203,7 @@ def test_an_existing_session_is_not_clobbered(project, monkeypatch, capsys):
 
     code = start.cmd_start(argparse.Namespace(
         config=str(cfg.path), session="t", replace=False, no_attach=True,
-        force=False, tmux=True, print=False))
+        force=False, tmux=True, print=False, ask=False))
 
     assert code == 1
     assert killed == []
@@ -273,8 +273,44 @@ def test_print_opens_nothing(project, tmp_path, monkeypatch, capsys):
 
     code = start.cmd_start(argparse.Namespace(
         config=str(cfg.path), session="s", replace=False, no_attach=True,
-        force=False, tmux=False, print=True))
+        force=False, tmux=False, print=True, ask=False))
 
     assert code == 0
     assert opened == []
     assert "ledger.sh" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------- unattended
+
+
+def test_agents_launch_without_permission_prompts(project, tmp_path):
+    """A session that stops for a click has stopped for good when nobody watches.
+
+    Defensible only because Metis's hooks fire independently of Claude Code's
+    permission system -- verified by launching a DevOps session with permissions
+    bypassed, asking it to edit source, and finding the file untouched.
+    """
+    cfg, _ = project
+
+    made = dict(start._scripts(cfg, tmp_path))
+
+    for role in ("swe", "devops", "tester"):
+        assert f"--permission-mode {start.AUTONOMOUS_MODE}" in made[role].read_text()
+
+
+def test_ask_puts_the_prompts_back(project, tmp_path):
+    cfg, _ = project
+
+    made = dict(start._scripts(cfg, tmp_path, ask=True))
+
+    for role in ("swe", "devops", "tester"):
+        assert "--permission-mode" not in made[role].read_text()
+
+
+def test_the_ledger_is_never_launched_with_a_permission_mode(project, tmp_path):
+    """It runs `metis watch`, not an agent. There is nothing to permit."""
+    cfg, _ = project
+
+    made = dict(start._scripts(cfg, tmp_path))
+
+    assert "--permission-mode" not in made["ledger"].read_text()

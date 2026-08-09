@@ -40,6 +40,23 @@ TITLES = {
 }
 
 
+# Agents run unattended, so a session that stops for a click has stopped for
+# good -- nobody is watching to answer it.
+#
+# This is defensible here for one specific reason, verified rather than assumed:
+# Metis's hooks fire independently of Claude Code's permission system. Launching
+# with permissions bypassed, a DevOps session asked to edit source is still
+# refused by `metis hook pre`, and the file is untouched. The role boundaries,
+# the test-tampering rule, the change-set push gate and the universal denies
+# (force-push, rm -rf /, curl | sh, fork bombs) all still apply.
+#
+# What is genuinely given up: the hook matcher covers Edit, Write, MultiEdit,
+# NotebookEdit and Bash. Any other tool -- WebFetch, MCP -- Metis never
+# inspects, and with permissions bypassed nothing else does either. That is the
+# trade, and `--ask` declines it.
+AUTONOMOUS_MODE = "bypassPermissions"
+
+
 def briefing(role: str) -> str:
     return (
         f"You are the {role.upper()} agent in a Metis run. "
@@ -131,14 +148,16 @@ def _launcher(workspace: Path, name: str, body: str) -> Path:
     return script
 
 
-def _scripts(cfg, workspace: Path) -> list[tuple[str, Path]]:
+def _scripts(cfg, workspace: Path, ask: bool = False) -> list[tuple[str, Path]]:
     made = [("ledger", _launcher(workspace, "ledger", "exec metis watch"))]
     for role in AGENTS:
         if role not in cfg.agents:
             continue
+        flags = "" if ask else f" --permission-mode {AUTONOMOUS_MODE}"
         made.append((role, _launcher(
             workspace, role,
-            f"export METIS_ROLE={role}\nexec claude {shlex.quote(briefing(role))}",
+            f"export METIS_ROLE={role}\n"
+            f"exec claude{flags} {shlex.quote(briefing(role))}",
         )))
     return made
 
@@ -177,7 +196,7 @@ def cmd_start(args: argparse.Namespace) -> int:
         print("\nFix these, or pass --force to start anyway.", file=sys.stderr)
         return 1
 
-    scripts = _scripts(cfg, workspace)
+    scripts = _scripts(cfg, workspace, ask=args.ask)
 
     if args.tmux:
         return _start_tmux(args, workspace, scripts)
@@ -196,6 +215,11 @@ def cmd_start(args: argparse.Namespace) -> int:
         return 1
 
     app = _terminal_app()
+    if not args.ask:
+        print("Agents run without permission prompts -- a session that stops for a")
+        print("click has stopped for good when nobody is watching. Metis's own")
+        print("refusals still apply: they are hooks, not permissions. Use --ask to")
+        print("be prompted instead.\n")
     print(f"Opening {len(scripts)} {app} windows\n")
 
     opened = 0
@@ -259,5 +283,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--session", default=SESSION, help=f"tmux session name (default {SESSION})")
     p.add_argument("--replace", action="store_true", help="tmux: kill an existing session first")
     p.add_argument("--no-attach", action="store_true", help="tmux: set up without attaching")
+    p.add_argument("--ask", action="store_true",
+                   help="prompt for permissions (default is unattended; Metis's "
+                        "own refusals apply either way)")
     p.add_argument("--force", action="store_true", help="start despite preflight problems")
     p.set_defaults(func=cmd_start)
