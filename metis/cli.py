@@ -41,7 +41,10 @@ def cmd_setup(args: argparse.Namespace) -> int:
     if not args.integration and not args.list:
         from . import wizard
 
-        outcome = wizard.run(root=Path(args.config).parent if args.config else None)
+        outcome = wizard.run(
+            root=Path(args.config).parent if args.config else None,
+            workspace=args.workspace,
+        )
         print(wizard.summarize(outcome))
         return 0 if all(ok for _, ok, _ in outcome.verifications) else 1
 
@@ -154,6 +157,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_setup.add_argument("integration", nargs="?",
                          help="jira | trello | git (omit for the guided wizard)")
+    p_setup.add_argument("--workspace",
+                         help="directory holding the repos agents will work on "
+                              "(default: ask, starting from the current directory)")
     p_setup.add_argument("--list", action="store_true", help="show what is configured")
     p_setup.add_argument("--verify", action="store_true", help="make a live call when listing")
     p_setup.set_defaults(func=cmd_setup)
