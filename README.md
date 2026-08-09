@@ -336,6 +336,30 @@ anything else.
 **The tracker is the authority.** Label a card `architecture`, `migration`, or
 `needs-review` and it gates, whatever the text says.
 
+**Cloud changes gate on what discovery can read.** Sizing knobs
+(`desired_count`, `instance_class`, `multi_az`, node pools, instance families
+like `db.r6g.2xlarge`) and managed resources that bill the moment they exist
+(NAT gateways, load balancers, clusters, Aurora, CloudFront) all stop for
+review. Grooming then shows what your IaC declares today, so you compare
+against a real value:
+
+```
+   infrastructure declared in this workspace
+     resources: aws_db_instance, aws_ecs_service
+     currently provisioned:
+       allocated_storage      500 (infra/main.tf:3)
+       desired_count          6 (infra/main.tf:8)
+       instance_class         db.r6g.2xlarge (infra/main.tf:2)
+       multi_az               true (infra/main.tf:4)
+     ^ read from your IaC. Metis attaches no prices -- check your
+       provider's calculator before approving a sizing change.
+```
+
+**Metis never estimates a price.** Cloud pricing is regional, tiered,
+usage-dependent and moves constantly; a figure generated here would be invented,
+and would be trusted precisely because it looked precise. What it gives you is
+the current value and the proposed change. The number comes from your provider.
+
 **Schema work splits in two.** Adding a column, a table, or an index is
 ordinary feature work and stays autonomous. Dropping, renaming, altering, or
 migrating does not -- no test catches a dropped column, because the build is

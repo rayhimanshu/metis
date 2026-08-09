@@ -81,6 +81,33 @@ ESCALATIONS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("has a cost or capacity implication",
      re.compile(r"\b(cost|billing|pricing|spend|budget|instance type|scale up|"
                 r"autoscal(?:e|ing)|throughput|quota|tier)\b", re.I)),
+
+    # The sizing knobs discovery reads out of IaC, matched by name. Pleasing
+    # symmetry: what `metis groom` can show you is what gates in the first
+    # place, so a review always has the current value to compare against.
+    ("changes cloud sizing",
+     re.compile(r"\b(desired_count|instance_class|instance_type|node_type|"
+                r"machine_type|min_capacity|max_capacity|desired_capacity|"
+                r"replica_count|shard_count|num_cache_nodes|allocated_storage|"
+                r"read_capacity|write_capacity|multi[-_ ]?az|node ?pool|"
+                r"replicas?|node count|task (?:memory|cpu|size)|"
+                r"(?:memory|cpu|ram) to \d+)\b"
+                # instance families: db.r6g.2xlarge, t3.medium, n2-standard-4
+                r"|\b(?:db|cache)\.[a-z0-9]+\.[a-z0-9]+\b"
+                r"|\b[a-z]\d+[a-z]*\.(?:nano|micro|small|medium|large|\d*xlarge)\b"
+                r"|\b(?:n|e|c|m)\d+-(?:standard|highmem|highcpu)-\d+\b", re.I)),
+
+    # Managed services that cost money the moment they exist. A NAT gateway or
+    # an idle cluster bills whether or not anything uses it, and no test notices.
+    ("provisions a managed cloud resource",
+     re.compile(r"\b(nat gateway|load balancer|elb|alb|nlb|api gateway|"
+                r"autopilot|reserved instance|savings plan|"
+                r"elasticache|opensearch|elasticsearch|kinesis|dynamodb|"
+                r"aurora|rds|fargate|lambda@edge|cloudfront|"
+                r"pub ?/ ?sub|bigquery|dataflow|cloud run|cloud sql)\b"
+                r"|\b(?:provision|spin up|stand up|create|add|introduce)\b"
+                r"[^.\n]{0,30}\b(?:cluster|gateway|queue|stream|bucket|"
+                r"cache|node pool|vpc|subnet|cdn)\b", re.I)),
     ("changes a public contract",
      re.compile(r"\b(breaking change|api version|deprecat(?:e|ion)|"
                 r"rename .{0,20}\b(?:field|endpoint|route)|contract change)\b", re.I)),
