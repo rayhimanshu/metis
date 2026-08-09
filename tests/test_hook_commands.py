@@ -183,3 +183,71 @@ def test_remove_dry_run_writes_nothing(tmp_path, monkeypatch):
         project=str(tmp_path), dry_run=True, force=True, remove=True))
 
     assert settings.read_text() == before
+
+
+# ---------------------------------------------------- where hooks land
+
+
+def _project(tmp_path, workspace_name="my-app"):
+    workspace = tmp_path / workspace_name
+    workspace.mkdir()
+    (tmp_path / "metis.yaml").write_text(
+        f"run:\n  workspace: {workspace}\n", encoding="utf-8")
+    return workspace
+
+
+def test_hooks_follow_the_configured_workspace(tmp_path, monkeypatch):
+    """Not the current directory.
+
+    Claude Code reads .claude/settings.json from wherever the session started,
+    and agents start in the workspace -- so hooks installed anywhere else are
+    simply never read.
+    """
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    workspace = _project(tmp_path)
+
+    cmd_install_hooks(Namespace(project=None, dry_run=False, force=True,
+                                remove=False, config=str(tmp_path / "metis.yaml")))
+
+    assert (workspace / ".claude" / "settings.json").is_file()
+    assert not (tmp_path / ".claude").exists(), "not where the config file sits"
+
+
+def test_an_explicit_path_still_wins(tmp_path, monkeypatch):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    _project(tmp_path)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+
+    cmd_install_hooks(Namespace(project=str(elsewhere), dry_run=False, force=True,
+                                remove=False, config=str(tmp_path / "metis.yaml")))
+
+    assert (elsewhere / ".claude" / "settings.json").is_file()
+
+
+def test_removal_follows_the_workspace_too(tmp_path, monkeypatch):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    workspace = _project(tmp_path)
+    config = str(tmp_path / "metis.yaml")
+
+    cmd_install_hooks(Namespace(project=None, dry_run=False, force=True,
+                                remove=False, config=config))
+    cmd_install_hooks(Namespace(project=None, dry_run=False, force=True,
+                                remove=True, config=config))
+
+    assert "metis hook" not in (workspace / ".claude" / "settings.json").read_text()
+
+
+def test_installing_twice_does_not_read_like_a_failure(tmp_path, monkeypatch, capsys):
+    """'0 hook(s) added' after asking to install looks like nothing worked."""
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    _project(tmp_path)
+    config = str(tmp_path / "metis.yaml")
+
+    for _ in range(2):
+        cmd_install_hooks(Namespace(project=None, dry_run=False, force=True,
+                                    remove=False, config=config))
+
+    out = capsys.readouterr().out
+    assert "already installed" in out
+    assert "0 hook(s)" not in out
