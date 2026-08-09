@@ -188,6 +188,22 @@ For one tmux window with panes instead of four windows -- better for recording:
 metis start --tmux
 ```
 
+Agents launch **without permission prompts**. A session that stops for a click
+has stopped for good when nobody is watching, and unattended is the point.
+
+That is safe here for one reason, verified rather than assumed: **Metis's
+refusals are hooks, not permissions, and hooks still fire.** Launch a DevOps
+session with permissions bypassed, ask it to edit source, and it is still
+refused -- role boundaries, the test-tampering rule, the change-set push gate
+and the universal denies all hold.
+
+What you give up: the hook sees `Edit`, `Write`, `MultiEdit`, `NotebookEdit`
+and `Bash`. Any other tool, Metis never inspects -- and with prompts off,
+nothing else does either. `metis start --ask` declines the trade.
+
+`metis install-hooks` also pre-approves `Bash(metis *)`, because stopping to ask
+permission for `metis post` is stopping to ask permission to speak.
+
 It refuses to start when something would make the run quietly useless -- hooks
 not installed, no run to work on, an agent still set to `spawned`, or `metis`
 missing from PATH. That last one is the dangerous case: the hooks shell out to
