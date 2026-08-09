@@ -38,7 +38,7 @@ def test_pressing_enter_throughout_produces_a_working_config(tmp_path):
     cfg = load(outcome.config_path)
     assert cfg.environment == "dev"
     assert cfg.max_iterations == 4
-    assert set(cfg.agents) == {"swe", "devops", "tester"}
+    assert set(cfg.agents) == {"swe", "devops"}, "no tester unless asked for"
     assert cfg.agents["swe"].mode == "attached"
     assert cfg.intake == {}
 

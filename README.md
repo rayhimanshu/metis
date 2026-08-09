@@ -8,7 +8,7 @@
 <h1 align="center">Metis</h1>
 
 <p align="center">
-  <em>Three autonomous coding agents. One shared ledger. No manager.</em>
+  <em>Autonomous coding agents. One shared ledger. No manager.</em>
 </p>
 
 <p align="center">
@@ -19,21 +19,21 @@
 
 </p>
 
-### SWE writes it. DevOps ships it. Tester breaks it.
+### SWE writes it. DevOps ships it and checks it.
 
-Three Claude sessions, three terminals, one codebase — and nobody telling any of
+Two Claude sessions, two terminals, one codebase — and nobody telling either of
 them what to do. Work arrives from Jira or Trello. They leave notes for each
 other in a shared ledger and get on with it.
 
 ```
 #11  09:08:15 requirement      intake    [api]
        why: Trello LG-42: Add a health-check endpoint
-#14  09:12:03 test_failed      tester    [api] <-#11
+#14  09:12:03 test_failed      devops    [api] <-#11
        why: endpoint 500s when the cache is cold
 #16  09:19:02 code_ready       swe       [api] <-#14
        why: initialise the cache before the probe reads it
 #18  09:20:44 build_passed     devops    [api] <-#16
-#21  09:23:18 test_passed      tester    [api] <-#16
+#21  09:23:18 test_passed      devops    [api] <-#16
 ```
 
 Fifteen minutes. A card became a fix, the regression in the middle repaired
@@ -54,7 +54,7 @@ reads the repo and works it out.
 | **[DESIGN.md](DESIGN.md)** | why a substrate, not an orchestrator — the boundary between dumb and smart |
 | **[PROTOCOL.md](PROTOCOL.md)** | the ledger: schema, event types, locks, and how changes that span repos stay coherent |
 | **[AUDIT.md](AUDIT.md)** | seeing every decision, every pause, every fault — and why each one happened |
-| **[metis/roles/](metis/roles/)** | the prompt for each agent — SWE, DevOps, Tester |
+| **[metis/roles/](metis/roles/)** | the prompt for each agent — SWE, DevOps, and an optional Tester |
 
 ---
 
@@ -238,6 +238,29 @@ Without the flag the wizard asks, defaulting to where you are.
 Discovery treats each git root as its own target with its own lock. Agents can work on different repositories simultaneously — never on the same one at the same time.
 
 Full details: [SETUP.md](SETUP.md#choosing-what-agents-work-on).
+
+### A third agent is optional
+
+The default is two. A build fails, DevOps has the log, SWE fixes it — that loop
+is two agents and a ledger, and adding a third to watch it is ceremony.
+
+A Tester earns its place when verification is genuinely separate work: a suite
+someone must run against a deployed environment, or an independent judgement
+about whether a fix holds. Then configure one:
+
+```yaml
+agents:
+  tester:
+    mode: attached
+    role: roles/tester.md
+    wake_on: [deployed]
+```
+
+Without one, DevOps verifies its own work and posts `test_passed` itself. It is
+not an independent judge, and the ledger records who posted what — but a stalled
+run is worse than a self-reported pass, and `test_passed` is what the dashboard,
+the tracker transition and the completion summary all key on. DevOps still
+cannot edit source to make a test go green.
 
 ## The philosophy
 

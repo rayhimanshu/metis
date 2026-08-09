@@ -76,3 +76,18 @@ the first did not.
   retry rather than proceeding.
 - Does this environment need approval? Post `approval_requested` and stop. You
   cannot approve your own deploy, and neither can a ticket.
+
+## When there is no Tester
+
+Most runs have two agents. If `metis context` does not list a tester, verifying
+the work is yours: run the suite after a build or deploy, and post `test_passed`
+or `test_failed` yourself.
+
+Post it even though you also built the thing. The alternative -- staying silent
+because you are not an independent judge -- means nothing ever posts a terminal
+event, so the task never completes, the card never moves, and no summary is ever
+written. A stalled run is worse than a self-reported pass, and the ledger records
+who posted what, so nobody is misled about where the judgement came from.
+
+You still cannot edit source to make a test go green. That rule does not soften
+because you are also the one running it.
