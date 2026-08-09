@@ -153,31 +153,42 @@ metis init-run --requirement "Add a health-check endpoint"
 
 Creates a run and waits for agents to pick up work.
 
-### 5. Open agent terminals
+### 5. Start the agents
 
-Open four terminals in the project directory:
+```bash
+metis start
+```
 
-**Terminal 1 — the ledger:**
+Opens the ledger and all three agents in one tmux window, each already briefed:
+
+```
++----------------+---------------------------+
+|                |  SWE - writes code        |
+|    LEDGER      +---------------------------+
+|  metis watch   |  DEVOPS - builds, deploys |
+|                +---------------------------+
+|                |  TESTER - verifies        |
++----------------+---------------------------+
+```
+
+It refuses to start when something would make the run quietly useless -- hooks
+not installed, no run to work on, an agent still set to `spawned`, or `metis`
+missing from PATH. That last one is the dangerous case: the hooks shell out to
+`metis hook pre`, so without it **nothing is enforced and the run looks
+identical to one that is.**
+
+Detach with `ctrl-b d`. To do it by hand instead, four terminals:
+
 ```bash
 metis watch
 ```
 
-Streams the event log as it grows. Lets you see every decision.
-
-**Terminal 2 — SWE:**
 ```bash
 METIS_ROLE=swe claude
 ```
 
-**Terminal 3 — DevOps:**
-```bash
-METIS_ROLE=devops claude
-```
-
-**Terminal 4 — Tester:**
-```bash
-METIS_ROLE=tester claude
-```
+...and the same for `devops` and `tester`, each given the briefing that
+`metis start` passes automatically.
 
 ### Notes
 
