@@ -233,3 +233,60 @@ def test_destructive_schema_work_is_gated(title):
 def test_migrations_are_gated_even_when_additive(title):
     """A migration locks, runs once, and is awkward to undo, whatever it contains."""
     assert triage.classify(title, "").gated
+
+
+# ------------------------------------------------------ cloud cost signals
+
+
+@pytest.mark.parametrize("title", [
+    "Move the billing database to db.r6g.4xlarge",
+    "Increase desired_count for the api service to 12",
+    "Enable multi-AZ on the orders database",
+    "Add a NAT gateway for the private subnet",
+    "Switch the cluster to GKE Autopilot",
+    "Provision a Redis cluster for sessions",
+])
+def test_cloud_sizing_and_provisioning_is_gated(title):
+    """Spend commitments that no test suite can notice."""
+    assert triage.classify(title, "").gated
+
+
+def test_iac_sizing_is_read_from_the_repository(tmp_path):
+    """Grooming shows what is provisioned today, from IaC and nothing else."""
+    from metis.discovery import iac
+
+    (tmp_path / "main.tf").write_text(
+        'resource "aws_db_instance" "billing" {\n'
+        '  instance_class    = "db.r6g.2xlarge"\n'
+        '  allocated_storage = 500\n'
+        '  multi_az          = true\n'
+        "}\n",
+        encoding="utf-8",
+    )
+
+    index = iac.build_index(tmp_path)
+
+    assert "aws_db_instance" in index.resources
+    assert any("db.r6g.2xlarge" in v for v in index.sizing["instance_class"])
+    assert any("500" in v for v in index.sizing["allocated_storage"])
+
+
+def test_no_price_is_ever_generated(tmp_path):
+    """Metis reports what is declared and never what it costs.
+
+    Cloud pricing is regional, tiered, usage-dependent and moves constantly, so
+    a figure produced here would be invented -- and believed precisely because
+    it looked precise. A sizing value is a fact; a dollar amount would not be.
+    """
+    from metis.discovery import iac
+
+    (tmp_path / "main.tf").write_text(
+        'resource "aws_db_instance" "b" {\n  instance_class = "db.r6g.2xlarge"\n}\n',
+        encoding="utf-8",
+    )
+
+    index = iac.build_index(tmp_path)
+    rendered = repr(index.sizing) + repr(index.resources)
+
+    for money in ("$", "USD", "per month", "/mo", "estimated cost"):
+        assert money not in rendered, f"a price leaked into discovery output: {money}"

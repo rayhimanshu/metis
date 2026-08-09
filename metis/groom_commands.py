@@ -17,7 +17,7 @@ def _open(args: argparse.Namespace):
     return cfg, Store(cfg.bus_path())
 
 
-def _show(waiting: dict, index: int | None = None) -> None:
+def _show(waiting: dict, index: int | None = None, cfg=None) -> None:
     mark = f"{index}. " if index else ""
     print(f"\n{mark}{waiting['issue_key']}  {waiting['title']}")
     print(f"   target: {waiting['target'] or '(none resolved)'}")
@@ -29,6 +29,55 @@ def _show(waiting: dict, index: int | None = None) -> None:
             print(f"   {line}")
         if len(body) > 12:
             print(f"   ... {len(body) - 12} more lines")
+
+    if waiting.get("design"):
+        print("\n   approach proposed by SWE")
+        for line in waiting["design"].strip().splitlines()[:15]:
+            print(f"     {line}")
+
+    if cfg is not None:
+        _show_infrastructure(cfg)
+
+
+def _show_infrastructure(cfg) -> None:
+    """What is provisioned today, for deciding what a change would move.
+
+    Facts read from IaC and nothing else. Metis does not attach a price to any
+    of it: cloud pricing is regional, tiered, usage-dependent and moves
+    constantly, so a figure generated here would be invented -- and would be
+    believed precisely because it looked precise. The numbers below are what
+    your repository declares; the cost of changing them comes from your
+    provider's calculator.
+    """
+    try:
+        from .discovery import iac
+
+        index = iac.build_index(cfg.workspace)
+    except Exception:
+        return
+
+    if not index.present:
+        return
+
+    print("\n   infrastructure declared in this workspace")
+    if index.resources:
+        kinds = sorted(index.resources)
+        print(f"     resources: {', '.join(kinds[:10])}"
+              + (f" (+{len(kinds) - 10} more)" if len(kinds) > 10 else ""))
+
+    if index.sizing:
+        print("     currently provisioned:")
+        for attribute, values in sorted(index.sizing.items()):
+            for value in values[:3]:
+                print(f"       {attribute:22} {value}")
+
+    if index.iam_actions:
+        actions = sorted(index.iam_actions)
+        print(f"     permissions: {', '.join(actions[:8])}"
+              + (f" (+{len(actions) - 8} more)" if len(actions) > 8 else ""))
+
+    print("     ^ read from your IaC. Metis attaches no prices -- check your")
+    print("       provider's calculator before approving a sizing change.")
 
 
 def cmd_groom(args: argparse.Namespace) -> int:
@@ -50,7 +99,7 @@ def cmd_groom(args: argparse.Namespace) -> int:
 
     print(f"{len(waiting)} task(s) waiting on you")
     for index, item in enumerate(waiting, 1):
-        _show(item, index)
+        _show(item, index, cfg=cfg)
 
     if args.list:
         print("\n`metis groom` without --list to review them.")
@@ -69,7 +118,7 @@ def cmd_groom(args: argparse.Namespace) -> int:
 
 def _review(store: Store, run_id: str, cfg, item: dict) -> bool:
     """Returns False to stop going through the queue."""
-    _show(item)
+    _show(item, cfg=cfg)
     print("\n  [a] approve   [e] edit the requirement, then approve"
           "   [r] reject   [s] skip   [q] quit")
 

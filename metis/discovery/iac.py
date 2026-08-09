@@ -30,6 +30,22 @@ CFN_NAMES = ("template.yaml", "template.yml", "cloudformation.yaml", "cloudforma
 SERVERLESS_NAMES = ("serverless.yml", "serverless.yaml")
 
 _TF_RESOURCE = re.compile(r'resource\s+"([a-zA-Z0-9_]+)"\s+"([a-zA-Z0-9_-]+)"')
+
+# The attributes that decide what infrastructure costs. Captured so a person
+# reviewing a gated change can see what is provisioned today without opening
+# the console -- the sizes, counts, and classes a change would move.
+#
+# Deliberately facts only. Metis never attaches a price to these: cloud pricing
+# is regional, tiered, usage-dependent and changes constantly, so any figure
+# generated here would be invented and would be trusted precisely because it
+# looked precise.
+_COST_ATTRS = re.compile(
+    r'^\s*(instance_class|instance_type|node_type|machine_type|desired_count|'
+    r'min_capacity|max_capacity|min_size|max_size|desired_capacity|'
+    r'allocated_storage|max_allocated_storage|storage_type|disk_size_gb|'
+    r'memory|memory_size|cpu|replica_count|num_cache_nodes|shard_count|'
+    r'read_capacity|write_capacity|billing_mode|multi_az|engine_version)'
+    r'\s*[:=]\s*"?([^"\n,}]+)"?', re.M)
 _TF_MODULE = re.compile(r'module\s+"([a-zA-Z0-9_-]+)"')
 _CFN_TYPE = re.compile(r"Type:\s*[\"']?(AWS::[A-Za-z0-9:]+)")
 # Any "service:Action" literal -- catches IAM actions wherever they appear.
@@ -47,6 +63,8 @@ class IacIndex:
     # Paths a load balancer polls. Deep dependency probes must never attach to
     # one of these -- see policy/bounds.py.
     lb_health_paths: dict[str, list[str]] = field(default_factory=dict)
+    # attribute -> ["value (file:line)"], for reviewing what a change moves.
+    sizing: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def present(self) -> bool:
@@ -113,6 +131,11 @@ def build_index(root: Path, max_bytes: int = 1_000_000) -> IacIndex:
             if is_cfn:
                 for m in _CFN_TYPE.finditer(text):
                     _record(index.resources, m.group(1), f"{rel}:{line_of(m.start())}")
+
+            if is_tf or is_cfn:
+                for m in _COST_ATTRS.finditer(text):
+                    _record(index.sizing, m.group(1),
+                            f"{m.group(2).strip()} ({rel}:{line_of(m.start())})")
 
             for m in _IAM_ACTION.finditer(text):
                 _record(index.iam_actions, m.group(1), f"{rel}:{line_of(m.start())}")

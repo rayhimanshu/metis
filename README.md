@@ -336,6 +336,30 @@ anything else.
 **The tracker is the authority.** Label a card `architecture`, `migration`, or
 `needs-review` and it gates, whatever the text says.
 
+**Cloud changes gate on what discovery can read.** Sizing knobs
+(`desired_count`, `instance_class`, `multi_az`, node pools, instance families
+like `db.r6g.2xlarge`) and managed resources that bill the moment they exist
+(NAT gateways, load balancers, clusters, Aurora, CloudFront) all stop for
+review. Grooming then shows what your IaC declares today, so you compare
+against a real value:
+
+```
+   infrastructure declared in this workspace
+     resources: aws_db_instance, aws_ecs_service
+     currently provisioned:
+       allocated_storage      500 (infra/main.tf:3)
+       desired_count          6 (infra/main.tf:8)
+       instance_class         db.r6g.2xlarge (infra/main.tf:2)
+       multi_az               true (infra/main.tf:4)
+     ^ read from your IaC. Metis attaches no prices -- check your
+       provider's calculator before approving a sizing change.
+```
+
+**Metis never estimates a price.** Cloud pricing is regional, tiered,
+usage-dependent and moves constantly; a figure generated here would be invented,
+and would be trusted precisely because it looked precise. What it gives you is
+the current value and the proposed change. The number comes from your provider.
+
 **Schema work splits in two.** Adding a column, a table, or an index is
 ordinary feature work and stays autonomous. Dropping, renaming, altering, or
 migrating does not -- no test catches a dropped column, because the build is
@@ -446,6 +470,57 @@ metis intake                # pull ready cards into the run
 - Flags instruction-shaped phrasing (e.g., "edit this file", "run this command") rather than stripping it
 - Prevents a ticket from naming a target (repo, service, environment) outside the workspace — the card can only work on what discovery found
 - Validates credentials before storing them — if you mistype your Jira URL or API token, the wizard catches it before it's too late
+
+## What lands back on the ticket
+
+When work finishes, the card gets one substantial comment -- not a running
+commentary. A comment per build attempt is what trains people to stop reading a
+ticket, so the detail is spent on the moment someone actually looks.
+
+```markdown
+**Metis: LG-42 complete**
+
+_Add a health-check endpoint_
+
+**Approach (approved by human)**
+Add /health-check, separate from the LB-polled /actuator/health,
+so a cache blip cannot drain every task.
+
+**Acceptance criteria, as written on this ticket**
+- returns 200 when the cache is reachable
+- returns 503 when it is not
+
+**Changed** — 3 file(s), +75 −1
+- `src/api/health.py` (+41 −0)
+- `src/api/routes.py` (+6 −1)
+- `tests/test_health.py` (+28 −0)
+
+**Verified**
+- build passed
+- test passed — 31 checks
+
+**Commands run** — 3, 1 failed
+- `pytest -q` exited 1
+
+---
+_Written from the Metis ledger. File changes and commands are recorded by
+hooks as they happen, not reported by the agent._
+```
+
+Every line of that is **ground truth**: file changes and commands were recorded
+by hooks as the tool ran, so nothing can be embellished or quietly left out --
+including the build that failed on the way. Acceptance criteria are lifted
+**verbatim** from what you wrote; Metis has no way to know what "done" means for
+your work, so it never invents them.
+
+Autonomous tasks get the same treatment. Nobody has to ask what an agent did.
+
+### Proposing before building
+
+An agent can read code without holding a lease, so a gated task can still be
+thought about -- the gate stops writing, not thinking. SWE posts
+`design_proposed` with its approach, and `metis groom` shows it beside the
+ticket, so one review covers both the work and the way it is going to be done.
 
 ## Audit — see everything, trust what can be verified
 

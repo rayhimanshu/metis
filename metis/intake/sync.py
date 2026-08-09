@@ -155,9 +155,13 @@ def push(store: Store, run_id: str, cfg: Config, dry_run: bool = False) -> list[
         except (json.JSONDecodeError, TypeError):
             payload = {}
 
-        body = MIRRORED[row["type"]](payload if isinstance(payload, dict) else {})
-        note = f"[metis] {body}"
-        mirrored.append(f"{issue_key}: {note}")
+        # A terminal event earns the full record; everything else gets a line.
+        # Chatter per build attempt is what trains people to stop reading a
+        # ticket, so the substantial comment is spent on the moment that matters.
+        note = _terminal_note(store, run_id, row, issue_key) or \
+            f"[metis] {MIRRORED[row['type']](payload if isinstance(payload, dict) else {})}"
+
+        mirrored.append(f"{issue_key}: {note.splitlines()[0]}")
 
         if not dry_run:
             source.comment(issue_key, note)
@@ -171,6 +175,38 @@ def push(store: Store, run_id: str, cfg: Config, dry_run: bool = False) -> list[
     if not dry_run:
         ev.set_cursor(store, run_id, "intake-out", cursor)
     return mirrored
+
+
+# Events that end a piece of work, one way or the other. These get the full
+# record rather than a one-liner.
+TERMINAL = {"test_passed", "halted", "deploy_failed"}
+
+
+def _terminal_note(store: Store, run_id: str, row, issue_key: str) -> str | None:
+    """The full record, when the work has actually finished."""
+    if row["type"] not in TERMINAL:
+        return None
+
+    requirement = _requirement_for(store, run_id, row["target"], int(row["id"]))
+    if requirement is None:
+        return None
+
+    from ..summary import for_requirement
+
+    return for_requirement(store, run_id, requirement,
+                           done=row["type"] == "test_passed")
+
+
+def _requirement_for(store: Store, run_id: str, target: str | None,
+                     before_id: int) -> int | None:
+    """The most recent requirement on this target before the given event."""
+    if not target:
+        return None
+    latest = None
+    for row in ev.read_since(store, run_id, 0, types=["requirement"], limit=10_000):
+        if row["target"] == target and int(row["id"]) < before_id:
+            latest = int(row["id"])
+    return latest
 
 
 def _issue_by_target(store: Store, run_id: str) -> dict[str, tuple[str, str]]:
