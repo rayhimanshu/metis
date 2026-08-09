@@ -30,6 +30,11 @@ def _show(waiting: dict, index: int | None = None, cfg=None) -> None:
         if len(body) > 12:
             print(f"   ... {len(body) - 12} more lines")
 
+    if waiting.get("design"):
+        print("\n   approach proposed by SWE")
+        for line in waiting["design"].strip().splitlines()[:15]:
+            print(f"     {line}")
+
     if cfg is not None:
         _show_infrastructure(cfg)
 

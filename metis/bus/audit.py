@@ -30,6 +30,7 @@ ROUTABLE_TYPES = {
     "requirement", "code_ready", "build_passed", "build_failed",
     "deploy_requested", "deployed", "deploy_failed",
     "test_passed", "test_failed", "review_findings", "approved", "halted",
+    "design_proposed",
 }
 
 # A lease held this long with no activity from its owner is suspicious.

@@ -471,6 +471,57 @@ metis intake                # pull ready cards into the run
 - Prevents a ticket from naming a target (repo, service, environment) outside the workspace — the card can only work on what discovery found
 - Validates credentials before storing them — if you mistype your Jira URL or API token, the wizard catches it before it's too late
 
+## What lands back on the ticket
+
+When work finishes, the card gets one substantial comment -- not a running
+commentary. A comment per build attempt is what trains people to stop reading a
+ticket, so the detail is spent on the moment someone actually looks.
+
+```markdown
+**Metis: LG-42 complete**
+
+_Add a health-check endpoint_
+
+**Approach (approved by human)**
+Add /health-check, separate from the LB-polled /actuator/health,
+so a cache blip cannot drain every task.
+
+**Acceptance criteria, as written on this ticket**
+- returns 200 when the cache is reachable
+- returns 503 when it is not
+
+**Changed** — 3 file(s), +75 −1
+- `src/api/health.py` (+41 −0)
+- `src/api/routes.py` (+6 −1)
+- `tests/test_health.py` (+28 −0)
+
+**Verified**
+- build passed
+- test passed — 31 checks
+
+**Commands run** — 3, 1 failed
+- `pytest -q` exited 1
+
+---
+_Written from the Metis ledger. File changes and commands are recorded by
+hooks as they happen, not reported by the agent._
+```
+
+Every line of that is **ground truth**: file changes and commands were recorded
+by hooks as the tool ran, so nothing can be embellished or quietly left out --
+including the build that failed on the way. Acceptance criteria are lifted
+**verbatim** from what you wrote; Metis has no way to know what "done" means for
+your work, so it never invents them.
+
+Autonomous tasks get the same treatment. Nobody has to ask what an agent did.
+
+### Proposing before building
+
+An agent can read code without holding a lease, so a gated task can still be
+thought about -- the gate stops writing, not thinking. SWE posts
+`design_proposed` with its approach, and `metis groom` shows it beside the
+ticket, so one review covers both the work and the way it is going to be done.
+
 ## Audit — see everything, trust what can be verified
 
 ```bash

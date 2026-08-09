@@ -209,6 +209,7 @@ def pending(store: Store, run_id: str, include_rejected: bool = False) -> list[d
         if int(row["id"]) in rejected and not include_rejected:
             continue
         waiting.append({
+            "design": _design_for(rows, int(row["id"]), row["target"]),
             "event_id": int(row["id"]),
             "target": row["target"],
             "issue_key": body.get("issue_key", "--"),
@@ -217,6 +218,21 @@ def pending(store: Store, run_id: str, include_rejected: bool = False) -> list[d
             "body": body.get("body", ""),
         })
     return waiting
+
+
+def _design_for(rows, requirement_id: int, target: str | None) -> str | None:
+    """An approach SWE proposed for this requirement, if it has.
+
+    Reading code needs no lease, so a gated task can still be thought about --
+    the gate stops writing, not thinking. Proposing first means the review is
+    of an approach rather than of a diff nobody asked for.
+    """
+    for row in rows:
+        if (row["type"] == "design_proposed" and row["target"] == target
+                and int(row["id"]) > requirement_id):
+            body = _payload(row)
+            return body.get("design") or row["rationale"]
+    return None
 
 
 def blocked_targets(store: Store, run_id: str) -> dict[str, dict]:
