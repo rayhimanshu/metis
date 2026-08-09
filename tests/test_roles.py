@@ -264,3 +264,47 @@ def test_a_present_tool_is_not_reported_missing(monkeypatch):
     monkeypatch.setattr(tooling.shutil, "which", lambda b: f"/usr/bin/{b}")
 
     assert tooling.missing(["aws_ecs", "kubernetes"]) == []
+
+
+def test_clouds_come_from_what_iac_provisions():
+    """Not from cfg.intake -- that holds Jira and Trello.
+
+    Passing intake keys as providers meant the cloud check silently never fired:
+    'trello' matches no provider, so gcloud and aliyun were never asked for.
+    """
+    from metis import tooling
+
+    assert tooling.providers_from_iac(["google_cloud_run_service"]) == ["gcp"]
+    assert tooling.providers_from_iac(["azurerm_app_service"]) == ["azure"]
+    assert tooling.providers_from_iac(["alicloud_slb"]) == ["alicloud"]
+    assert tooling.providers_from_iac(["aws_db_instance"]) == ["aws"]
+    assert tooling.providers_from_iac(["AWS::Lambda::Function"]) == ["aws"]
+
+    assert tooling.providers_from_iac(["trello", "jira"]) == []
+    assert tooling.providers_from_iac([]) == []
+
+
+def test_a_multi_cloud_workspace_needs_every_cli(monkeypatch):
+    from metis import tooling
+
+    monkeypatch.setattr(tooling.shutil, "which", lambda b: None)
+    providers = tooling.providers_from_iac(
+        ["google_cloud_run_service", "alicloud_slb", "aws_s3_bucket"])
+
+    binaries = {t.binary for t in tooling.missing([], providers)}
+
+    assert binaries == {"gcloud", "aliyun", "aws"}
+
+
+def test_gcp_is_reachable_even_though_discovery_cannot_detect_it():
+    """DEPLOY_SIGNATURES covers ECS, Lambda, k8s, registries, Firebase,
+    Serverless and Vercel -- there is no Cloud Run or App Service signature.
+
+    IaC is what makes those clouds visible at all, so the provider path is the
+    only route to gcloud, az and aliyun. It has to work.
+    """
+    from metis import tooling
+
+    assert "gcp" not in tooling.REQUIRED
+    assert "gcp" in tooling.PROVIDER_TOOLS
+    assert tooling.needed([], ["gcp"])[0].binary == "gcloud"

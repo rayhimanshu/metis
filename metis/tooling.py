@@ -85,6 +85,33 @@ PROVIDER_TOOLS: dict[str, Tool] = {
 }
 
 
+# Which cloud a resource belongs to, by the prefix its type carries. This is the
+# honest signal for "do we use GCP": discovery cannot yet recognise a Cloud Run
+# or App Service deployment from CI config -- DEPLOY_SIGNATURES covers ECS,
+# Lambda, Kubernetes, registries, Firebase, Serverless and Vercel -- but if your
+# Terraform declares google_cloud_run_service, you use GCP and need gcloud.
+RESOURCE_PREFIXES: list[tuple[str, str]] = [
+    ("google_", "gcp"),
+    ("azurerm_", "azure"),
+    ("alicloud_", "alicloud"),
+    ("aws_", "aws"),
+    ("AWS::", "aws"),
+]
+
+
+def providers_from_iac(resource_types) -> list[str]:
+    """Clouds this workspace actually provisions into.
+
+    Read from IaC rather than asked for, and ordered so the answer is stable.
+    """
+    found: list[str] = []
+    for resource in resource_types or []:
+        for prefix, provider in RESOURCE_PREFIXES:
+            if str(resource).startswith(prefix) and provider not in found:
+                found.append(provider)
+    return sorted(found)
+
+
 def needed(kinds: list[str], providers: list[str] | None = None) -> list[Tool]:
     """Tools justified by what this workspace actually deploys to."""
     seen: dict[str, Tool] = {}
