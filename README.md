@@ -114,7 +114,8 @@ It asks a few questions. Press enter to take defaults, or customize:
 | Workspace directory | yes | current directory |
 | Environment name | yes | `dev` |
 | Iteration cap per run | yes | `4` |
-| How to run agents | yes | SWE attached, DevOps/Tester spawned |
+| Separate Tester agent | no | no — DevOps verifies its own work |
+| How to run agents | yes | SWE attached, DevOps spawned |
 | Work source (Jira/Trello/none) | no | none |
 | Jira URL, email, token | only if Jira | — |
 | Trello board, key, token | only if Trello | — |
@@ -165,9 +166,9 @@ Creates a run and waits for agents to pick up work.
 metis start
 ```
 
-Opens four terminal windows -- the ledger and all three agents, each already
-briefed. Nothing clever happens: every window runs the command you would type
-yourself.
+Opens a terminal window for the ledger and one for each configured agent, each
+already briefed. Nothing clever happens: every window runs the command you would
+type yourself.
 
 ```bash
 metis start --print
@@ -182,7 +183,8 @@ export METIS_ROLE=swe
 exec claude 'You are the SWE agent in a Metis run. Run `metis context ...'
 ```
 
-For one tmux window with panes instead of four windows -- better for recording:
+For one tmux window with panes instead of separate windows -- better for
+recording:
 
 ```bash
 metis start --tmux
@@ -194,7 +196,7 @@ missing from PATH. That last one is the dangerous case: the hooks shell out to
 `metis hook pre`, so without it **nothing is enforced and the run looks
 identical to one that is.**
 
-Detach with `ctrl-b d`. To do it by hand instead, four terminals:
+To do it by hand instead, one terminal each:
 
 ```bash
 metis watch
@@ -204,8 +206,9 @@ metis watch
 METIS_ROLE=swe claude
 ```
 
-...and the same for `devops` and `tester`, each given the briefing that
-`metis start` passes automatically.
+...and the same for `devops`, plus `tester` if you configured one — each given
+the briefing `metis start` passes automatically. Under `--tmux`, detach with
+`ctrl-b d`.
 
 ### Notes
 
@@ -215,7 +218,7 @@ METIS_ROLE=swe claude
 
 ### Customize agent prompts
 
-The three agent prompts ship inside the package, so a fresh install works with no files to create. To customize one:
+The agent prompts ship inside the package, so a fresh install works with no files to create. To customize one:
 
 ```bash
 metis roles --eject
@@ -266,7 +269,7 @@ cannot edit source to make a test go green.
 
 A Claude session is already an agentic loop — **reason, act, observe, retry**. That works.
 
-What a single agent lacks is the ability to work alongside others on the same code. Add three agents, and you need: communication (so they know what the others did), shared truth (so they agree on what happened), and safety (so their independence doesn't become chaos).
+What a single agent lacks is the ability to work alongside another on the same code. Add a second, and you need three things: communication (so each knows what the other did), shared truth (so they agree on what happened), and safety (so their independence does not become chaos).
 
 The substrate provides exactly those three things and nothing more. It records events, delivers them, grants leases, and enforces a stop condition. It decides nothing. It judges nothing. It only says: "you may act" or "you may not, because someone else is".
 
@@ -532,6 +535,32 @@ What this catches is the silent case: **DevOps cannot deploy and nothing says
 so** until a deploy fails halfway through. `metis doctor --verify` checks every
 provider, and reports the identity rather than just a tick — a failing deploy is
 far more often the wrong role than a missing credential.
+
+## Tools a run needs
+
+```bash
+metis doctor
+```
+
+```
+tooling
+  --  aliyun is missing -- needed to read logs and confirm the account
+      brew install aliyun-cli
+```
+
+Checked **before** the run. A deploy that dies halfway on a missing binary has
+already taken a lease and maybe pushed an image; finding out here costs nothing.
+
+What counts as needed is bounded by evidence, like everything else. Discovery
+reports each target's deploy kind, and IaC says which clouds you provision into
+— `google_` resources mean you need `gcloud`, `alicloud_` means `aliyun`. A CLI
+nothing here deploys to is not required, whatever it would be convenient for.
+
+When an agent hits a missing tool anyway, it installs only what discovery
+justifies, through a package manager already on the machine. **Never by piping a
+downloaded script into a shell** — that is refused by the hook, because it turns
+a missing binary into arbitrary code running as the person who trusted it.
+Otherwise it posts `blocked` and stops.
 
 ## Intake — from issue tracker to work
 
