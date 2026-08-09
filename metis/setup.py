@@ -161,6 +161,99 @@ def verify_git(cfg: Config) -> tuple[bool, str]:
 # registry
 # --------------------------------------------------------------------------
 
+
+# --------------------------------------------------------------- cloud
+#
+# Every one of these verifies and stores nothing.
+#
+# Cloud CLIs already resolve credentials through chains Metis has no business
+# competing with: SSO sessions, assumed roles, instance metadata, application
+# default credentials. Those are usually short-lived and rotate. Asking someone
+# to paste a static access key so Metis can keep a second copy would be a
+# downgrade in security dressed up as convenience -- and the agent runs `aws`
+# or `gcloud` anyway, which picks up the ambient credential regardless of what
+# Metis stored.
+#
+# What matters is catching the silent case: DevOps cannot deploy, and nothing
+# says so until a deploy fails halfway through. So these check, and report
+# which identity is actually in play.
+
+
+def _cli(binary: str, argv: list[str], timeout: int = 20) -> tuple[bool, str]:
+    if not shutil.which(binary):
+        return False, f"{binary} is not installed"
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True,
+                              check=False, timeout=timeout)
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, f"{binary} failed to run: {e}"
+
+    out = (proc.stdout or proc.stderr or "").strip()
+    if proc.returncode != 0:
+        first = out.splitlines()[0][:160] if out else "no output"
+        return False, first
+    return True, out
+
+
+def verify_aws(cfg: Config) -> tuple[bool, str]:
+    ok, out = _cli("aws", ["aws", "sts", "get-caller-identity", "--output", "text"])
+    if not ok:
+        return False, f"{out} (try: aws sso login, or aws configure)"
+
+    # account, arn, userid -- tab separated. The ARN says which role is in play,
+    # which is the thing worth reporting: a deploy failing on permissions is
+    # nearly always the wrong role rather than a missing credential.
+    parts = out.split()
+    account = parts[0] if parts else "?"
+    arn = next((p for p in parts if p.startswith("arn:")), "")
+    region = subprocess.run(["aws", "configure", "get", "region"],
+                            capture_output=True, text=True, check=False).stdout.strip()
+    where = f", region {region}" if region else ", no default region"
+    return True, f"account {account}{where}" + (f" as {arn.split('/')[-1]}" if arn else "")
+
+
+def verify_gcp(cfg: Config) -> tuple[bool, str]:
+    ok, out = _cli("gcloud", ["gcloud", "auth", "list",
+                              "--filter=status:ACTIVE", "--format=value(account)"])
+    if not ok:
+        # Keep the real reason. "No active account" when the binary is simply
+        # absent sends someone to run a login that cannot work.
+        return False, out
+    if not out:
+        return False, "no active gcloud account (try: gcloud auth login)"
+
+    project = subprocess.run(["gcloud", "config", "get-value", "project"],
+                             capture_output=True, text=True, check=False).stdout.strip()
+    account = out.splitlines()[0]
+    if not project or project == "(unset)":
+        return False, f"{account} is active but no project is set (gcloud config set project)"
+    return True, f"{account}, project {project}"
+
+
+def verify_azure(cfg: Config) -> tuple[bool, str]:
+    ok, out = _cli("az", ["az", "account", "show", "--output", "tsv",
+                          "--query", "[name,id,user.name]"])
+    if not ok:
+        return False, f"{out} (try: az login)"
+    parts = out.split("\t")
+    name = parts[0] if parts else "?"
+    who = parts[2] if len(parts) > 2 else ""
+    return True, f"subscription {name}" + (f" as {who}" if who else "")
+
+
+def verify_alicloud(cfg: Config) -> tuple[bool, str]:
+    ok, out = _cli("aliyun", ["aliyun", "sts", "GetCallerIdentity"])
+    if not ok:
+        return False, f"{out} (try: aliyun configure)"
+    import json as _json
+
+    try:
+        body = _json.loads(out)
+        return True, f"account {body.get('AccountId', '?')} as {body.get('Arn', '?')}"
+    except ValueError:
+        return True, "authenticated"
+
+
 INTEGRATIONS: dict[str, Integration] = {
     "jira": Integration(
         name="jira",
@@ -204,7 +297,16 @@ intake:
         fields=[Field("token", "GitHub personal access token", "keychain", required=False)],
         verify=verify_git,
     ),
+    # No fields at all: these are checked, never stored. See the note above.
+    "aws": Integration(name="aws", label="AWS", fields=[], verify=verify_aws),
+    "gcp": Integration(name="gcp", label="Google Cloud", fields=[], verify=verify_gcp),
+    "azure": Integration(name="azure", label="Azure", fields=[], verify=verify_azure),
+    "alicloud": Integration(name="alicloud", label="Alibaba Cloud",
+                            fields=[], verify=verify_alicloud),
 }
+
+# Providers Metis checks but never holds credentials for.
+CLOUD = ("aws", "gcp", "azure", "alicloud")
 
 
 def run_setup(name: str, cfg: Config) -> int:
@@ -212,6 +314,9 @@ def run_setup(name: str, cfg: Config) -> int:
     if not integration:
         print(f"unknown integration '{name}'. Known: {', '.join(sorted(INTEGRATIONS))}")
         return 2
+
+    if name in CLOUD:
+        return _check_cloud(integration, cfg)
 
     print(f"\nSetting up {integration.label}")
     print(f"Secrets are stored in: {secrets.backend_description()}")
@@ -250,6 +355,28 @@ def run_setup(name: str, cfg: Config) -> int:
     return 0 if ok else 1
 
 
+def _check_cloud(integration: Integration, cfg: Config) -> int:
+    """Report a cloud identity. Nothing is asked for and nothing is stored.
+
+    Deliberately not a setup step. Pasting a static access key here so Metis
+    could keep a second copy would replace a short-lived SSO session with a
+    long-lived secret -- worse security, sold as convenience.
+    """
+    print(f"\nChecking {integration.label}")
+    print("Metis stores no cloud credentials. Your CLI already resolves them")
+    print("through SSO, assumed roles, or instance metadata, and DevOps runs")
+    print("that CLI directly.\n")
+
+    ok, detail = integration.verify(cfg)
+    print(f"  {'ok ' if ok else '-- '} {detail}")
+
+    if not ok:
+        print("\nDevOps will be able to build and test, but not deploy.")
+        return 1
+    print("\nDevOps will deploy as this identity. Check it is the one you meant.")
+    return 0
+
+
 def status(cfg: Config, verify: bool = False) -> list[tuple[str, bool, str]]:
     """Per-integration state. Reports whether a secret is set, never its value."""
     rows: list[tuple[str, bool, str]] = []
@@ -257,6 +384,13 @@ def status(cfg: Config, verify: bool = False) -> list[tuple[str, bool, str]]:
     for name, integration in sorted(INTEGRATIONS.items()):
         stored = [f for f in integration.secret_fields if secrets.present(integration.secret_key(f.name))]
         required = [f for f in integration.secret_fields if f.required]
+
+        if name in CLOUD:
+            # Never "not configured": there is nothing here to configure.
+            ok, detail = integration.verify(cfg) if verify else (
+                True, "checked at --verify time; nothing stored")
+            rows.append((name, ok, detail))
+            continue
 
         if not stored and required:
             rows.append((name, False, "not configured"))
