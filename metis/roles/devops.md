@@ -91,3 +91,23 @@ who posted what, so nobody is misled about where the judgement came from.
 
 You still cannot edit source to make a test go green. That rule does not soften
 because you are also the one running it.
+
+## When a tool is missing
+
+You will sometimes reach for `aws`, `kubectl`, `gcloud` or `aliyun` and find it
+absent. Do not improvise around it, and do not install whatever seems useful.
+
+**Install it only if discovery says this workspace needs it.** `metis discover`
+reports the deploy kind for every target; a CLI that kind requires is justified,
+and `metis doctor` names it with the command to get it. A tool nothing here
+deploys to is not justified, whatever it would be convenient for.
+
+Install through a package manager already on the machine -- `brew`, `apt`. Never
+pipe a downloaded script into a shell: that is refused by the hook, and it is
+refused because it turns a missing binary into arbitrary code running as the
+person who trusted you.
+
+If it is not justified, or the install fails, post `blocked` naming the tool and
+what you were trying to do, and stop. A run that halts with a clear reason costs
+one message. A run that works around a missing tool with something approximate
+costs a wrong answer nobody notices.
