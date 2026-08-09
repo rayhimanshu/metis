@@ -159,16 +159,27 @@ Creates a run and waits for agents to pick up work.
 metis start
 ```
 
-Opens the ledger and all three agents in one tmux window, each already briefed:
+Opens four terminal windows -- the ledger and all three agents, each already
+briefed. Nothing clever happens: every window runs the command you would type
+yourself.
 
+```bash
+metis start --print
 ```
-+----------------+---------------------------+
-|                |  SWE - writes code        |
-|    LEDGER      +---------------------------+
-|  metis watch   |  DEVOPS - builds, deploys |
-|                +---------------------------+
-|                |  TESTER - verifies        |
-+----------------+---------------------------+
+
+shows exactly what will be invoked, and opens nothing:
+
+```bash
+#!/usr/bin/env bash
+cd /your/project || exit 1
+export METIS_ROLE=swe
+exec claude 'You are the SWE agent in a Metis run. Run `metis context ...'
+```
+
+For one tmux window with panes instead of four windows -- better for recording:
+
+```bash
+metis start --tmux
 ```
 
 It refuses to start when something would make the run quietly useless -- hooks
