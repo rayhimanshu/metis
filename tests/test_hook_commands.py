@@ -162,7 +162,7 @@ def test_removing_twice_is_harmless(tmp_path, monkeypatch, capsys):
             project=str(tmp_path), dry_run=False, force=True, remove=True))
         assert code == 0
 
-    assert "no Metis hooks" in capsys.readouterr().out
+    assert "nothing of Metis's" in capsys.readouterr().out
 
 
 def test_remove_with_no_settings_says_so(tmp_path):
@@ -183,3 +183,57 @@ def test_remove_dry_run_writes_nothing(tmp_path, monkeypatch):
         project=str(tmp_path), dry_run=True, force=True, remove=True))
 
     assert settings.read_text() == before
+
+
+# ------------------------------------------------- the protocol is allowed
+
+
+def test_metis_commands_are_pre_approved(tmp_path, monkeypatch):
+    """Stopping to ask permission for `metis post` is asking permission to speak."""
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+
+    cmd_install_hooks(Namespace(project=str(tmp_path), dry_run=False,
+                                force=True, remove=False))
+
+    data = json.loads((tmp_path / ".claude" / "settings.json").read_text())
+    assert "Bash(metis *)" in data["permissions"]["allow"]
+
+
+def test_permissions_you_already_had_are_kept(tmp_path, monkeypatch):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": ["Bash(./mvnw *)"]}}), encoding="utf-8")
+
+    cmd_install_hooks(Namespace(project=str(tmp_path), dry_run=False,
+                                force=True, remove=False))
+
+    allow = json.loads((tmp_path / ".claude" / "settings.json").read_text())["permissions"]["allow"]
+    assert "Bash(./mvnw *)" in allow
+    assert "Bash(metis *)" in allow
+
+
+def test_removal_takes_the_permission_back_out(tmp_path, monkeypatch):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    (tmp_path / ".claude").mkdir()
+    (tmp_path / ".claude" / "settings.json").write_text(
+        json.dumps({"permissions": {"allow": ["Bash(./mvnw *)"]}}), encoding="utf-8")
+
+    cmd_install_hooks(Namespace(project=str(tmp_path), dry_run=False,
+                                force=True, remove=False))
+    cmd_install_hooks(Namespace(project=str(tmp_path), dry_run=False,
+                                force=True, remove=True))
+
+    data = json.loads((tmp_path / ".claude" / "settings.json").read_text())
+    assert data["permissions"]["allow"] == ["Bash(./mvnw *)"]
+
+
+def test_installing_twice_adds_one_permission_not_two(tmp_path, monkeypatch):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+
+    for _ in range(2):
+        cmd_install_hooks(Namespace(project=str(tmp_path), dry_run=False,
+                                    force=True, remove=False))
+
+    allow = json.loads((tmp_path / ".claude" / "settings.json").read_text())["permissions"]["allow"]
+    assert allow.count("Bash(metis *)") == 1

@@ -13,6 +13,27 @@ from .hooks import SETTINGS_TEMPLATE, dispatch
 
 ROLES = ("swe", "devops", "tester")
 
+# The coordination protocol itself. An agent runs these constantly -- claiming a
+# lease, posting an event, waiting on one -- and stopping to ask permission for
+# `metis post` is stopping to ask permission to speak. Pre-approving them keeps
+# a run moving without touching what anything else may do.
+PROTOCOL_PERMISSIONS = ["Bash(metis *)"]
+
+
+def _allow_protocol(settings: dict) -> int:
+    """Let agents run Metis's own commands without a prompt each time."""
+    permissions = settings.setdefault("permissions", {})
+    allow = permissions.setdefault("allow", [])
+    if not isinstance(allow, list):
+        return 0
+
+    added = 0
+    for entry in PROTOCOL_PERMISSIONS:
+        if entry not in allow:
+            allow.append(entry)
+            added += 1
+    return added
+
 
 def cmd_hook(args: argparse.Namespace) -> int:
     return dispatch(args.which)
@@ -115,6 +136,7 @@ def cmd_install_hooks(args: argparse.Namespace) -> int:
             return 1
 
     merged, added = _merge_hooks(existing, template)
+    allowed = _allow_protocol(merged)
 
     if args.dry_run:
         print(json.dumps(merged, indent=2))
@@ -123,7 +145,16 @@ def cmd_install_hooks(args: argparse.Namespace) -> int:
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(json.dumps(merged, indent=2) + "\n", encoding="utf-8")
 
-    print(f"wrote {settings_path} ({added} hook(s) added)")
+    if added or allowed:
+        parts = []
+        if added:
+            parts.append(f"{added} hook(s)")
+        if allowed:
+            parts.append(f"{allowed} permission(s) so agents can run metis commands")
+        print(f"wrote {settings_path}: added {' and '.join(parts)}")
+    else:
+        # "0 added" after asking to install reads like a failure.
+        print(f"already set up in {settings_path} -- nothing to do")
     print("\nLaunch an agent with its role in the environment:\n")
     for role in ROLES:
         print(f"  METIS_ROLE={role} claude")
@@ -144,8 +175,21 @@ def _remove_hooks(project: Path, dry_run: bool) -> int:
         return 1
 
     cleaned, removed = _strip_metis(existing)
-    if not removed:
-        print(f"no Metis hooks in {settings_path}")
+
+    dropped = 0
+    allow = cleaned.get("permissions", {}).get("allow")
+    if isinstance(allow, list):
+        kept = [e for e in allow if e not in PROTOCOL_PERMISSIONS]
+        dropped = len(allow) - len(kept)
+        if kept:
+            cleaned["permissions"]["allow"] = kept
+        else:
+            del cleaned["permissions"]["allow"]
+            if not cleaned["permissions"]:
+                del cleaned["permissions"]
+
+    if not removed and not dropped:
+        print(f"nothing of Metis's in {settings_path}")
         return 0
 
     if dry_run:
@@ -153,8 +197,14 @@ def _remove_hooks(project: Path, dry_run: bool) -> int:
         return 0
 
     settings_path.write_text(json.dumps(cleaned, indent=2) + "\n", encoding="utf-8")
-    print(f"removed {removed} Metis hook(s) from {settings_path}")
-    print("Any hooks you added yourself were left alone.")
+
+    parts = []
+    if removed:
+        parts.append(f"{removed} hook(s)")
+    if dropped:
+        parts.append(f"{dropped} permission(s)")
+    print(f"removed {' and '.join(parts)} from {settings_path}")
+    print("Anything you added yourself was left alone.")
     return 0
 
 
