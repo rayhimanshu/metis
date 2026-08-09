@@ -34,6 +34,11 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def _mark(ok: bool | None) -> str:
+    """ok / failed / not checked. The third is not a decoration."""
+    return "ok " if ok else ("-- " if ok is False else "?  ")
+
+
 def cmd_setup(args: argparse.Namespace) -> int:
     from . import setup as setup_mod
 
@@ -56,8 +61,10 @@ def cmd_setup(args: argparse.Namespace) -> int:
 
         print(f"store: {secrets.backend_description()}\n")
         for name, ok, detail in rows:
-            mark = "ok " if ok else "-- "
-            print(f"  {mark} {name:8} {detail}")
+            print(f"  {_mark(ok)} {name:8} {detail}")
+
+        if any(ok is None for _, ok, _ in rows) and not args.verify:
+            print("\n?  means not checked. Add --verify to make a live call.")
         print("\nValues are never displayed. Configure with: metis setup <integration>")
         return 0
 
@@ -125,8 +132,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     if not cfg.intake:
         print("  (none configured in metis.yaml)")
     for name, ok, detail in setup_mod.status(cfg, verify=args.verify):
-        print(f"  {'ok ' if ok else '-- '} {name:8} {detail}")
-        if not ok and name in cfg.intake:
+        print(f"  {_mark(ok)} {name:8} {detail}")
+        if ok is False and name in cfg.intake:
             problems += 1
 
     print(f"\n{problems} problem(s)")

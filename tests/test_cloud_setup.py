@@ -158,3 +158,48 @@ def test_setup_exits_nonzero_when_a_cloud_cannot_deploy(cfg, monkeypatch):
     installed(monkeypatch)
 
     assert setup_mod.run_setup("aws", cfg) == 1
+
+
+# ------------------------------------------------------- not checked is a state
+
+
+def test_unchecked_is_not_reported_as_working(cfg, monkeypatch):
+    """`ok` beside "not checked" claims something nobody established.
+
+    The listing showed `ok  aws  checked at --verify time` before any check had
+    run, which reads as a working deploy path when it is silence.
+    """
+    installed(monkeypatch)
+    rows = {name: ok for name, ok, _ in setup_mod.status(cfg, verify=False)}
+
+    for provider in setup_mod.CLOUD:
+        assert rows[provider] is setup_mod.UNKNOWN
+
+
+def test_verify_turns_unknown_into_an_answer(cfg, monkeypatch):
+    installed(monkeypatch, "aws")
+    monkeypatch.setattr(setup_mod.subprocess, "run", fake_run({
+        "sts get-caller-identity": (0, "111122223333\tarn:aws:iam::1:user/x\tAID"),
+        "configure get region": (0, "eu-west-1"),
+    }))
+
+    rows = {name: ok for name, ok, _ in setup_mod.status(cfg, verify=True)}
+
+    assert rows["aws"] is True
+    assert rows["gcp"] is False, "an absent CLI is a real answer, not an unknown"
+
+
+def test_an_unstored_optional_secret_is_unknown_not_fine(cfg, monkeypatch):
+    """git has every field optional; nothing stored proves nothing either way."""
+    monkeypatch.setattr(setup_mod.secrets, "present", lambda key: False)
+    rows = {name: ok for name, ok, _ in setup_mod.status(cfg, verify=False)}
+
+    assert rows["git"] is setup_mod.UNKNOWN
+
+
+def test_the_three_markers_are_distinct():
+    from metis.cli import _mark
+
+    assert _mark(True).strip() == "ok"
+    assert _mark(False).strip() == "--"
+    assert _mark(None).strip() == "?"
