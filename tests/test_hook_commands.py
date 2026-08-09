@@ -93,3 +93,93 @@ def test_dry_run_writes_nothing(tmp_path, monkeypatch):
     code = cmd_install_hooks(Namespace(project=str(tmp_path), dry_run=True, force=False))
     assert code == 0
     assert not (tmp_path / ".claude").exists()
+
+
+# ----------------------------------------------------------------- removal
+
+
+def _own_hook(settings_path):
+    """A hook the project owner added, beside Metis's."""
+    data = json.loads(settings_path.read_text())
+    data["hooks"]["PreToolUse"].append({
+        "matcher": "Bash",
+        "hooks": [{"type": "command", "command": "my-own-linter --check"}],
+    })
+    settings_path.write_text(json.dumps(data, indent=2))
+
+
+def test_remove_takes_out_metis_hooks(tmp_path, monkeypatch):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=False))
+
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=True))
+
+    text = (tmp_path / ".claude" / "settings.json").read_text()
+    assert "metis hook" not in text
+
+
+def test_removal_leaves_hooks_you_added_yourself(tmp_path, monkeypatch):
+    """A settings file is the project's, not ours.
+
+    Uninstalling one tool has no business deleting another's configuration.
+    """
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=False))
+    settings = tmp_path / ".claude" / "settings.json"
+    _own_hook(settings)
+
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=True))
+
+    text = settings.read_text()
+    assert "my-own-linter" in text
+    assert "metis hook" not in text
+
+
+def test_an_emptied_event_is_dropped_not_left_behind(tmp_path, monkeypatch):
+    """A matcher with no hooks is debris, not a rule that matches nothing."""
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=False))
+
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=True))
+
+    data = json.loads((tmp_path / ".claude" / "settings.json").read_text())
+    assert "hooks" not in data, "nothing was left, so nothing should remain"
+
+
+def test_removing_twice_is_harmless(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=False))
+
+    for _ in range(2):
+        code = cmd_install_hooks(Namespace(
+            project=str(tmp_path), dry_run=False, force=True, remove=True))
+        assert code == 0
+
+    assert "no Metis hooks" in capsys.readouterr().out
+
+
+def test_remove_with_no_settings_says_so(tmp_path):
+    code = cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=True))
+
+    assert code == 0
+
+
+def test_remove_dry_run_writes_nothing(tmp_path, monkeypatch):
+    monkeypatch.setattr("metis.hook_commands.shutil.which", lambda _: "/usr/bin/metis")
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=False, force=True, remove=False))
+    settings = tmp_path / ".claude" / "settings.json"
+    before = settings.read_text()
+
+    cmd_install_hooks(Namespace(
+        project=str(tmp_path), dry_run=True, force=True, remove=True))
+
+    assert settings.read_text() == before

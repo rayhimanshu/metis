@@ -294,6 +294,12 @@ each project agents will work on:
 metis install-hooks
 ```
 
+To take them out again, leaving any hooks you added yourself alone:
+
+```bash
+metis install-hooks --remove
+```
+
 It **merges** into an existing `.claude/settings.json` rather than overwriting,
 is idempotent, and refuses if `metis` is not on your PATH.
 
