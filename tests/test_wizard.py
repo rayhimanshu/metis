@@ -38,7 +38,7 @@ def test_pressing_enter_throughout_produces_a_working_config(tmp_path):
     cfg = load(outcome.config_path)
     assert cfg.environment == "dev"
     assert cfg.max_iterations == 4
-    assert set(cfg.agents) == {"swe", "devops", "tester"}
+    assert set(cfg.agents) == {"swe", "devops"}, "no tester unless asked for"
     assert cfg.agents["swe"].mode == "attached"
     assert cfg.intake == {}
 
@@ -276,3 +276,19 @@ def test_without_the_flag_the_question_is_still_asked(tmp_path):
     wizard.run(ask=ask, root=tmp_path, interactive=False, store_secrets=False)
 
     assert any("Workspace" in q for q in asked)
+
+
+def test_exhausted_input_takes_defaults_rather_than_crashing(monkeypatch, tmp_path):
+    """A smoke test piping a fixed number of newlines died when a question
+    was added, which had quietly made the count of questions part of the
+    contract. Every question here has a working default, so running out of
+    input should mean the same thing as pressing enter.
+    """
+    def eof(*_args, **_kwargs):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", eof)
+    monkeypatch.chdir(tmp_path)
+
+    assert wizard._prompt("Workspace", ".") == "."
+    assert wizard._prompt("No default") == ""

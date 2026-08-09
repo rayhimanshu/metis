@@ -56,7 +56,18 @@ def _prompt(question: str, default: str | None = None) -> str:
 
     suffix = f" [{default}]" if default else ""
     sys.stdout.flush()
-    answer = input(f"{question}{suffix}: ").strip()
+    try:
+        answer = input(f"{question}{suffix}: ").strip()
+    except EOFError:
+        # Input ran out. Every question here has a default that works, and the
+        # wizard's promise is that pressing enter throughout produces a working
+        # configuration -- so exhausted input should mean the same thing.
+        #
+        # It was not: a smoke test piping a fixed number of newlines crashed the
+        # moment a question was added, which made the count of questions part of
+        # the contract by accident.
+        print()
+        return default or ""
     return answer or (default or "")
 
 
@@ -91,7 +102,7 @@ def render_config(values: dict[str, Any]) -> str:
         "devops": "[code_ready, deploy_requested, approved]",
         "tester": "[deployed]",
     }
-    for name in ("swe", "devops", "tester"):
+    for name in values["modes"]:
         lines += [
             f"  {name}:",
             f"    mode: {values['modes'][name]}          # attached | spawned",
@@ -158,12 +169,22 @@ def collect(ask: Asker, existing: Config | None, interactive: bool = True,
         "Environment name (used as a lock key, so staging and prod stay separate)",
         existing.environment if existing else "dev",
     )
+    # Two agents is the common shape: a build fails, DevOps has the log, SWE
+    # fixes it. A third to watch that loop is ceremony unless verification is
+    # genuinely separate work.
+    values["tester"] = ask(
+        "Add a separate Tester agent? (DevOps verifies its own work otherwise)",
+        "n",
+    ).strip().lower().startswith("y")
+
     values["max_iterations"] = ask(
         "Iteration cap before a run halts and asks for a human",
         str(existing.max_iterations) if existing else "4",
     )
 
-    default_modes = {"swe": "attached", "devops": "spawned", "tester": "spawned"}
+    default_modes = {"swe": "attached", "devops": "spawned"}
+    if values.get("tester"):
+        default_modes["tester"] = "spawned"
     if existing:
         default_modes = {n: a.mode for n, a in existing.agents.items()} or default_modes
 
@@ -171,7 +192,7 @@ def collect(ask: Asker, existing: Config | None, interactive: bool = True,
         ask, f"Use recommended agent modes ({', '.join(f'{k}={v}' for k, v in default_modes.items())})"
     ):
         modes = {}
-        for name in ("swe", "devops", "tester"):
+        for name in default_modes:
             modes[name] = ask(f"  {name} mode (attached | spawned)", default_modes[name])
         values["modes"] = modes
     else:

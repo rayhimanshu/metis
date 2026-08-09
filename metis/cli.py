@@ -128,6 +128,26 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                     print(f"      hint: {check.hint}")
                     problems += 1
 
+    # Tooling, bounded by what discovery found. A deploy that dies halfway
+    # because a binary is absent has already taken a lease and maybe pushed an
+    # image; finding out here costs nothing.
+    from . import tooling
+
+    try:
+        from .discovery import pipeline
+
+        _, targets, _ = pipeline.discover(str(cfg.workspace), environment=cfg.environment)
+        kinds = [(t_.deployment or {}).get("kind") for t_ in targets]
+        gaps = tooling.report([k for k in kinds if k], list(cfg.intake or []) )
+    except Exception:
+        gaps = []
+
+    if gaps:
+        print("\ntooling")
+        for line in gaps:
+            print(f"  {line}" if line.startswith("    ") else f"  --  {line}")
+        problems += 1
+
     print("\nintegrations")
     if not cfg.intake:
         print("  (none configured in metis.yaml)")

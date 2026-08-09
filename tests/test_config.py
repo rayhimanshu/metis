@@ -16,7 +16,10 @@ def test_defaults_apply_when_no_file(tmp_path):
     cfg = load(tmp_path / "missing.yaml")
     assert cfg.environment == "dev"
     assert cfg.max_iterations == 4
-    assert set(cfg.agents) == {"swe", "devops", "tester"}
+    # No tester by default: a build fails, DevOps has the log, SWE fixes it.
+    # A third agent to watch that loop is ceremony unless verification is
+    # genuinely separate work.
+    assert set(cfg.agents) == {"swe", "devops"}
     assert cfg.agents["swe"].mode == "attached"
     assert cfg.agents["devops"].mode == "spawned"
 
@@ -74,3 +77,34 @@ def test_sample_contains_no_credentials():
             stripped = line.strip()
             if word in stripped and not stripped.startswith("#"):
                 pytest.fail(f"sample() has an uncommented line mentioning {word!r}: {line}")
+
+
+def test_a_tester_joins_when_configured(tmp_path):
+    """Opt-in, not opt-out. Verification as separate work is the exception."""
+    (tmp_path / "metis.yaml").write_text(
+        "agents:\n"
+        "  swe:\n    mode: attached\n    role: roles/swe.md\n    wake_on: [requirement]\n"
+        "  devops:\n    mode: spawned\n    role: roles/devops.md\n    wake_on: [code_ready]\n"
+        "  tester:\n    mode: attached\n    role: roles/tester.md\n    wake_on: [deployed]\n",
+        encoding="utf-8",
+    )
+
+    cfg = load(tmp_path / "metis.yaml")
+
+    assert set(cfg.agents) == {"swe", "devops", "tester"}
+    assert cfg.agents["tester"].mode == "attached"
+
+
+def test_devops_is_told_to_verify_when_alone():
+    """Without this, nothing posts a terminal event and no task ever finishes.
+
+    test_passed is what the dashboard, the tracker transition and the completion
+    summary all key on.
+    """
+    from pathlib import Path as _Path
+
+    prompt = (_Path(__file__).parent.parent / "metis" / "roles" / "devops.md").read_text()
+
+    assert "no Tester" in prompt
+    assert "test_passed" in prompt
+    assert "cannot edit source" in prompt

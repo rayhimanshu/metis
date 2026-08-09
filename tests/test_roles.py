@@ -211,3 +211,56 @@ def test_hook_fails_open_on_malformed_input(workspace):
         check=False,
     )
     assert result.returncode == 0
+
+
+# ------------------------------------------------------- missing tooling
+
+
+def test_devops_is_told_what_to_do_about_a_missing_cli():
+    """'Install whatever you need' makes an agent's guess sufficient authority."""
+    from pathlib import Path
+
+    prompt = (Path(__file__).parent.parent / "metis" / "roles" / "devops.md").read_text()
+
+    assert "When a tool is missing" in prompt
+    assert "discovery says this workspace needs it" in prompt
+    assert "Never" in prompt and "pipe" in prompt
+    assert "post `blocked`" in prompt
+
+
+def test_only_tools_the_workspace_deploys_to_are_justified():
+    from metis import tooling
+
+    assert [t.binary for t in tooling.needed(["aws_ecs"])] == ["aws", "docker"]
+    assert tooling.needed(["unknown"]) == []
+    assert tooling.needed([]) == []
+
+
+def test_a_configured_provider_justifies_its_cli():
+    """Logs and identity need the CLI even when CI does the deploying."""
+    from metis import tooling
+
+    binaries = [t.binary for t in tooling.needed([], ["alicloud", "gcp"])]
+
+    assert set(binaries) == {"aliyun", "gcloud"}
+
+
+def test_install_hints_never_pipe_a_script(monkeypatch):
+    """curl | sh is in the universal deny list, and for good reason."""
+    from metis import tooling
+
+    monkeypatch.setattr(tooling.shutil, "which",
+                        lambda b: "/opt/homebrew/bin/brew" if b == "brew" else None)
+
+    for kinds in (["aws_ecs"], ["kubernetes"], ["aws_lambda"]):
+        for tool in tooling.needed(kinds):
+            hint = tooling.install_hint(tool)
+            assert "curl" not in hint and "|" not in hint, hint
+
+
+def test_a_present_tool_is_not_reported_missing(monkeypatch):
+    from metis import tooling
+
+    monkeypatch.setattr(tooling.shutil, "which", lambda b: f"/usr/bin/{b}")
+
+    assert tooling.missing(["aws_ecs", "kubernetes"]) == []

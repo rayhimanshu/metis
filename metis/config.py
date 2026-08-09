@@ -29,8 +29,27 @@ DEFAULTS: dict[str, Any] = {
                 "wake_on": ["requirement", "build_failed", "test_failed", "review_findings"]},
         "devops": {"mode": "spawned", "role": "roles/devops.md",
                    "wake_on": ["code_ready", "deploy_requested", "approved"]},
-        "tester": {"mode": "spawned", "role": "roles/tester.md",
-                   "wake_on": ["deployed"]},
+        # No tester by default.
+        #
+        # Most work does not need a third party to notice a failure: a build
+        # fails, DevOps has the log, SWE fixes it. That loop is two agents and
+        # a ledger, and adding a third to watch it is ceremony.
+        #
+        # A tester earns its place when verification is genuinely separate work
+        # -- a suite someone must run against a deployed environment, or an
+        # independent judgement about whether a fix actually holds. Configure
+        # it explicitly and it joins:
+        #
+        #     agents:
+        #       tester:
+        #         mode: attached
+        #         role: roles/tester.md
+        #         wake_on: [deployed]
+        #
+        # Without one, DevOps owns verification and posts `test_passed` itself.
+        # That event name is about what happened, not who did it, and keeping
+        # it means the dashboard, the tracker transition and the completion
+        # summary all still work.
     },
     "intake": {},
 }
