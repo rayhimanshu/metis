@@ -25,6 +25,7 @@ from .bus.store import Store
 from .config import Config
 from .intake import sync
 from .intake.base import Issue, to_requirement_payload
+from .triage import classify
 
 # Where a task can end up. Anything else means it is still moving.
 DONE = "done"
@@ -185,6 +186,13 @@ def take(
 
     for issue in issues:
         payload = to_requirement_payload(issue, known_targets)
+
+        # Classified here, at the boundary, so the verdict is recorded on the
+        # requirement itself and survives in the ledger.
+        verdict = classify(issue.title, issue.body, issue.labels,
+                           issue.raw.get("issue_type") if issue.raw else None)
+        payload["gate"] = verdict.risk
+        payload["gate_reasons"] = verdict.reasons
         event_id = ev.post(
             store, run_id, "requirement",
             agent="intake",

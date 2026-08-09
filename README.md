@@ -301,6 +301,55 @@ Each agent can run **attached** (you open a terminal, the agent stays in it, wok
 
 Configure it during setup. One hook config serves all three roles — the hooks read `$METIS_ROLE` at runtime.
 
+## What agents may start alone
+
+Most work is safe to hand over: a bug fix, a new endpoint, a failing test. The
+blast radius is a diff, the tests judge it, and a mistake costs a rerun.
+
+Some work is not. Adding a service, taking a new dependency, migrating a schema,
+resizing infrastructure -- these commit money, lock in structure, and are
+painful to walk back. **The tests still pass, so nothing downstream catches
+them.**
+
+So work is classified as it arrives, and the expensive kind stops at a gate:
+
+```
+refused: 'billing' is waiting on human review: LG-77 (changes a database
+schema; has a cost or capacity implication). Run `metis groom` to review it.
+Architectural work is not started unattended.
+```
+
+That is the lease broker refusing, not a prompt asking nicely. An agent may only
+act while holding every key its action declares, so refusing the lock refuses
+the work.
+
+```bash
+metis groom
+```
+
+Shows what is waiting and why, lets you refine the requirement, then approve or
+reject. Only a human can clear a gate -- the bus refuses `approved` from
+anything else.
+
+### Two rules keep it honest
+
+**The tracker is the authority.** Label a card `architecture`, `migration`, or
+`needs-review` and it gates, whatever the text says.
+
+**Schema work splits in two.** Adding a column, a table, or an index is
+ordinary feature work and stays autonomous. Dropping, renaming, altering, or
+migrating does not -- no test catches a dropped column, because the build is
+green precisely because it is gone.
+
+**Heuristics may only escalate.** Wording can raise a task to gated; nothing
+can lower one. A classifier that quietly decides "just a bug fix" and is wrong
+is the single failure a safety gate cannot have, so that direction is
+impossible rather than unlikely. A ticket claiming to be pre-approved changes
+nothing.
+
+Ambiguity therefore costs you thirty seconds. The opposite mistake costs a
+production migration nobody agreed to.
+
 ## Safety — enforced before a prompt is written
 
 Rules are not advice. They are enforced by hooks before the tool runs. An agent cannot talk itself around them because the check happens *before* the attempt, not after.

@@ -27,9 +27,6 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-SOURCE_SUFFIXES = (".java", ".kt", ".py", ".js", ".ts", ".jsx", ".tsx", ".go",
-                   ".rb", ".cs", ".rs", ".scala", ".groovy", ".php")
-
 TEST_PATTERNS = (
     "**/test/**", "**/tests/**", "**/__tests__/**", "**/spec/**",
     "**/src/test/**", "test_*.py", "*_test.py", "*.test.*", "*.spec.*",
@@ -121,10 +118,6 @@ def _matches(rel: str, patterns: list[str]) -> bool:
 
 def is_test_path(rel: str) -> bool:
     return _matches(rel, list(TEST_PATTERNS))
-
-
-def is_source_path(rel: str) -> bool:
-    return PurePosixPath(rel).suffix in SOURCE_SUFFIXES
 
 
 def check_write(
