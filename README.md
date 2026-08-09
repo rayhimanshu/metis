@@ -319,6 +319,65 @@ Rules are not advice. They are enforced by hooks before the tool runs. An agent 
 
 **Agents never see raw tokens.** The substrate holds credentials and acts on their behalf. An agent cannot leak what it was never handed. Secrets are stored in the OS keychain, resolved at runtime only when needed, and redacted from every log before it's written.
 
+## Picking up work
+
+```bash
+metis
+```
+
+The dashboard, read straight from the local ledger — what is in flight, what
+finished, what holds a lease. No network, so it answers instantly and works
+offline.
+
+```
+run 20260809-115048   RUNNING   iteration 1/4   env=dev
+
+in flight (1)
+    LG-42        Add a health-check endpoint                  [api]
+        waiting -- code ready, waiting on a build
+
+finished (1)
+    LG-43        Cache warmup                                 [api]
+        done -- tests passed
+
+leases (1)
+    swe holds worktree:api@main (slot 0) until 06:30:49
+```
+
+To take something on:
+
+```bash
+metis work
+```
+
+Fetches what is ready on your board, shows it alongside anything already
+running, and lets you choose:
+
+```
+ready to pick up (2)
+ 1. LG-44        Add retry to the payment webhook
+ 2. LG-45        Drop the legacy /v1 health route
+
+Which? numbers like 1 or 1,3 -- 'a' for all, enter to skip
+> 1
+```
+
+Looking is free: `metis work` posts nothing and moves no card until you pick.
+Taking one posts a `requirement` event and moves that card to your in-progress
+list.
+
+### Without being asked
+
+```bash
+metis work --auto
+```
+
+Polls the tracker and keeps the queue fed — one task at a time by default
+(`--max-in-flight`). It **feeds work in; it does not run agents.** Your three
+sessions stay sessions you can watch and interrupt. And it stops handing out
+new work the moment a task halts, because burying the thing that needs a human
+under three more is how unattended systems fail quietly.
+
 ## Intake — from issue tracker to work
 
 ```bash

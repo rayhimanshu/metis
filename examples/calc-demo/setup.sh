@@ -30,8 +30,8 @@ if ! command -v metis >/dev/null; then
   echo "The hooks invoke 'metis hook pre', so without it on PATH the safety" >&2
   echo "rails silently never fire. Install it first:" >&2
   echo >&2
-  echo "  uv tool install git+https://github.com/rayhimanshu/metis.git" >&2
-  echo "  # or: pipx install git+https://github.com/rayhimanshu/metis.git" >&2
+  echo "  pipx install git+https://github.com/rayhimanshu/metis.git" >&2
+  echo "  # or: uv tool install git+https://github.com/rayhimanshu/metis.git" >&2
   exit 1
 fi
 
@@ -57,7 +57,7 @@ metis discover >/dev/null
 metis init-run --requirement "$REQUIREMENT" >/dev/null
 
 echo
-metis state | head -5
+metis
 echo
 echo "Ready. Open four terminals in this directory and follow README.md:"
 echo "  1) metis watch"

@@ -142,7 +142,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--version", action="version", version=f"metis {__version__}")
     parser.add_argument("-c", "--config", help="path to metis.yaml")
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(dest="command")
 
     p_init = sub.add_parser("init", help="write a starter metis.yaml")
     p_init.add_argument("path", nargs="?", help="defaults to ./metis.yaml")
@@ -169,8 +169,14 @@ def build_parser() -> argparse.ArgumentParser:
     from .intake import commands as intake_commands
     from .policy import commands as policy_commands
 
+    from . import work_commands
     from .bus import changeset_commands
 
+    # No subcommand shows the dashboard, so `metis` alone answers "what is
+    # happening?" -- from the local ledger, without touching the network.
+    parser.set_defaults(func=work_commands.cmd_dashboard)
+
+    work_commands.register(sub)
     bus_commands.register(sub)
     changeset_commands.register(sub)
     audit_commands.register(sub)

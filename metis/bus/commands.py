@@ -68,6 +68,21 @@ def _format(row) -> str:
 # --------------------------------------------------------------- commands
 
 
+def _sole_target(cfg) -> str | None:
+    """The only target, when there is exactly one. Otherwise nothing.
+
+    Guessing between several would attribute a requirement to the wrong one,
+    which is worse than leaving it unattributed.
+    """
+    try:
+        from ..discovery import pipeline
+
+        _, targets, _ = pipeline.discover(str(cfg.workspace), environment=cfg.environment)
+        return targets[0].name if len(targets) == 1 else None
+    except Exception:
+        return None
+
+
 def cmd_init_run(args: argparse.Namespace) -> int:
     store, cfg = _store(args)
     store.initialize()
@@ -80,8 +95,13 @@ def cmd_init_run(args: argparse.Namespace) -> int:
         requirement=args.requirement,
         max_iterations=args.max_iterations or cfg.max_iterations,
     )
-    ev.post(store, run_id, "requirement", agent="human", payload=args.requirement,
-            rationale="run started")
+    # Without a target the requirement cannot be followed: events link back to
+    # a requirement by target and nothing else, so `metis` would report it as
+    # untracked forever. On a single-target workspace there is no ambiguity, so
+    # resolve it rather than making everyone pass --target.
+    target = args.target or _sole_target(cfg)
+    ev.post(store, run_id, "requirement", agent="human", target=target,
+            payload=args.requirement, rationale="run started")
     print(run_id)
     return 0
 
@@ -301,6 +321,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--workspace")
     p.add_argument("--environment")
     p.add_argument("--max-iterations", type=int)
+    p.add_argument("--target", help="which target this is about "
+                                     "(defaults to the only one, if there is only one)")
     p.add_argument("--run-id")
     p.set_defaults(func=cmd_init_run)
 
