@@ -108,6 +108,17 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         print(f"\nfinished ({len(finished)})")
         _show_tasks(finished)
 
+    from . import triage
+
+    waiting = triage.pending(store, run["id"])
+    if waiting:
+        print(f"\nwaiting on you ({len(waiting)})")
+        for item in waiting:
+            print(f"    {item['issue_key']:<12} {item['title'][:44]:<44} "
+                  f"[{item['target'] or 'no target'}]")
+            print(f"        {'; '.join(item['reasons']) or 'flagged for review'}")
+        print("    -> metis groom")
+
     holders = leases.held_by(store, run["id"])
     print(f"\nleases ({len(holders)})")
     for holder in holders:

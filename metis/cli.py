@@ -169,7 +169,7 @@ def build_parser() -> argparse.ArgumentParser:
     from .intake import commands as intake_commands
     from .policy import commands as policy_commands
 
-    from . import work_commands
+    from . import groom_commands, work_commands
     from .bus import changeset_commands
 
     # No subcommand shows the dashboard, so `metis` alone answers "what is
@@ -177,6 +177,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.set_defaults(func=work_commands.cmd_dashboard)
 
     work_commands.register(sub)
+    groom_commands.register(sub)
     bus_commands.register(sub)
     changeset_commands.register(sub)
     audit_commands.register(sub)

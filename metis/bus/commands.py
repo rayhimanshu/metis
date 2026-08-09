@@ -169,6 +169,18 @@ def cmd_claim(args: argparse.Namespace) -> int:
     owner = _owner(args)
 
     keys = args.keys
+
+    # A gated requirement stops work at the lock rather than in a prompt: an
+    # agent may only act while holding every key its action declares, so a
+    # refusal here refuses the work itself.
+    from ..triage import check_key
+
+    for key in keys:
+        allowed, reason = check_key(store, run["id"], key)
+        if not allowed:
+            print(f"refused: {reason}", file=sys.stderr)
+            return 1
+
     granted, results, expired = leases.claim_all(
         store, run["id"], keys, owner, args.ttl
     )
