@@ -44,11 +44,58 @@ def _merge_hooks(existing: dict, incoming: dict) -> tuple[dict, int]:
     return merged, added
 
 
+def _strip_metis(settings: dict) -> tuple[dict, int]:
+    """Remove Metis's hooks, leaving anyone else's alone.
+
+    A project's settings file is not ours. Someone may have added their own
+    hooks beside these, and uninstalling one tool has no business deleting
+    another's configuration -- so this removes entries by command rather than
+    dropping the block.
+    """
+    hooks = settings.get("hooks")
+    if not isinstance(hooks, dict):
+        return settings, 0
+
+    removed = 0
+    for event, matchers in list(hooks.items()):
+        if not isinstance(matchers, list):
+            continue
+
+        kept_matchers = []
+        for matcher in matchers:
+            entries = matcher.get("hooks") if isinstance(matcher, dict) else None
+            if not isinstance(entries, list):
+                kept_matchers.append(matcher)
+                continue
+
+            kept = [e for e in entries
+                    if not str(e.get("command", "")).startswith("metis hook")]
+            removed += len(entries) - len(kept)
+
+            # A matcher with no hooks left is an empty rule, not a rule that
+            # matches nothing -- drop it rather than leaving debris behind.
+            if kept:
+                matcher["hooks"] = kept
+                kept_matchers.append(matcher)
+
+        if kept_matchers:
+            hooks[event] = kept_matchers
+        else:
+            del hooks[event]
+
+    if not hooks:
+        del settings["hooks"]
+    return settings, removed
+
+
 def cmd_install_hooks(args: argparse.Namespace) -> int:
     project = Path(args.project or ".").expanduser().resolve()
     if not project.is_dir():
         print(f"not a directory: {project}", file=sys.stderr)
         return 2
+
+    if getattr(args, "remove", False):
+        return _remove_hooks(project, args.dry_run)
 
     if not shutil.which("metis") and not args.force:
         print("`metis` is not on PATH, so the hooks would never fire.", file=sys.stderr)
@@ -81,6 +128,33 @@ def cmd_install_hooks(args: argparse.Namespace) -> int:
     for role in ROLES:
         print(f"  METIS_ROLE={role} claude")
     print("\nWithout METIS_ROLE the hooks stay inert, so an ordinary session is unaffected.")
+    return 0
+
+
+def _remove_hooks(project: Path, dry_run: bool) -> int:
+    settings_path = project / ".claude" / "settings.json"
+    if not settings_path.is_file():
+        print(f"no settings at {settings_path} -- nothing to remove")
+        return 0
+
+    try:
+        existing = json.loads(settings_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        print(f"{settings_path} is not valid JSON; refusing to touch it", file=sys.stderr)
+        return 1
+
+    cleaned, removed = _strip_metis(existing)
+    if not removed:
+        print(f"no Metis hooks in {settings_path}")
+        return 0
+
+    if dry_run:
+        print(json.dumps(cleaned, indent=2))
+        return 0
+
+    settings_path.write_text(json.dumps(cleaned, indent=2) + "\n", encoding="utf-8")
+    print(f"removed {removed} Metis hook(s) from {settings_path}")
+    print("Any hooks you added yourself were left alone.")
     return 0
 
 
@@ -122,6 +196,8 @@ def register(sub: argparse._SubParsersAction) -> None:
     p.add_argument("project", nargs="?", help="defaults to the current directory")
     p.add_argument("--dry-run", action="store_true", help="print the merged settings")
     p.add_argument("--force", action="store_true", help="proceed even if metis is not on PATH")
+    p.add_argument("--remove", action="store_true",
+                   help="take Metis's hooks out again, leaving any others alone")
     p.set_defaults(func=cmd_install_hooks)
 
     p = sub.add_parser("roles", help="show role prompts, or copy them into the project")

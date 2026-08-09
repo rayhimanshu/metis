@@ -143,6 +143,12 @@ Scans your repo(s) and outputs:
 metis install-hooks
 ```
 
+To take them out again, leaving any hooks you added yourself alone:
+
+```bash
+metis install-hooks --remove
+```
+
 Merges Metis hooks into your project's Claude settings. Refuses if `metis` is not on your PATH (prevents silent failures).
 
 ### 4. Start your first run
