@@ -377,8 +377,18 @@ def _check_cloud(integration: Integration, cfg: Config) -> int:
     return 0
 
 
-def status(cfg: Config, verify: bool = False) -> list[tuple[str, bool, str]]:
-    """Per-integration state. Reports whether a secret is set, never its value."""
+# Three states, not two. "Unknown" is a real answer here and collapsing it into
+# either of the others is a lie: saying ok claims a working integration nobody
+# checked, and saying failed sends someone hunting for a problem that may not
+# exist. Only --verify can turn an unknown into one of the other two.
+UNKNOWN = None
+
+
+def status(cfg: Config, verify: bool = False) -> list[tuple[str, bool | None, str]]:
+    """Per-integration state. Reports whether a secret is set, never its value.
+
+    The middle value is True (working), False (broken), or None (not checked).
+    """
     rows: list[tuple[str, bool, str]] = []
 
     for name, integration in sorted(INTEGRATIONS.items()):
@@ -387,9 +397,11 @@ def status(cfg: Config, verify: bool = False) -> list[tuple[str, bool, str]]:
 
         if name in CLOUD:
             # Never "not configured": there is nothing here to configure.
-            ok, detail = integration.verify(cfg) if verify else (
-                True, "checked at --verify time; nothing stored")
-            rows.append((name, ok, detail))
+            if verify:
+                rows.append((name, *integration.verify(cfg)))
+            else:
+                rows.append((name, UNKNOWN,
+                             "nothing to store -- not checked (add --verify)"))
             continue
 
         if not stored and required:
@@ -402,9 +414,9 @@ def status(cfg: Config, verify: bool = False) -> list[tuple[str, bool, str]]:
         elif stored:
             rows.append((name, True, "secrets stored: " + ", ".join(f.name for f in stored)))
         else:
-            # Every field optional and nothing stored. Saying "ok" here would
-            # claim a working integration on the strength of having asked for
-            # nothing -- report what will actually be tried instead.
-            rows.append((name, True, "no stored secret -- will try existing tooling (run --verify)"))
+            # Every field optional and nothing stored. Saying "ok" would claim a
+            # working integration on the strength of having asked for nothing.
+            rows.append((name, UNKNOWN,
+                         "no stored secret -- will try existing tooling (add --verify)"))
 
     return rows
