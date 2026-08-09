@@ -210,3 +210,69 @@ def test_trello_gets_both_list_transitions(tmp_path, monkeypatch):
     assert trello["list_name"] == "Ready for Dev"
     assert trello["on_start"] == "Doing"
     assert trello["on_done"] == "Done"
+
+
+# ------------------------------------------------------------- --workspace
+
+
+def test_an_explicit_workspace_is_not_asked_about(tmp_path):
+    """Naming a directory on the command line has already answered the question."""
+    project = tmp_path / "my-app"
+    project.mkdir()
+
+    asked: list[str] = []
+
+    def ask(question, default=""):
+        asked.append(question)
+        return default
+
+    outcome = wizard.run(ask=ask, root=tmp_path, interactive=False,
+                         store_secrets=False, workspace=str(project))
+
+    assert outcome.values["workspace"] == str(project)
+    assert not any("Workspace" in q for q in asked), \
+        "it should not ask for something it was told"
+
+
+def test_the_config_lands_beside_the_code_it_describes(tmp_path):
+    """A metis.yaml in an unrelated directory describes repos it cannot see."""
+    project = tmp_path / "my-app"
+    project.mkdir()
+
+    outcome = wizard.run(ask=lambda q, d="": d, root=tmp_path, interactive=False,
+                         store_secrets=False, workspace=str(project))
+
+    assert outcome.config_path.parent == project
+
+
+def test_a_missing_directory_is_refused_before_anything_is_written(tmp_path):
+    """Failing at the prompt beats writing a config pointing nowhere."""
+    from metis.config import ConfigError
+
+    with pytest.raises(ConfigError, match="no such directory"):
+        wizard.run(ask=lambda q, d="": d, root=tmp_path, interactive=False,
+                   store_secrets=False, workspace=str(tmp_path / "does-not-exist"))
+
+    assert not list(tmp_path.glob("**/metis.yaml"))
+
+
+def test_a_tilde_path_is_expanded(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    (tmp_path / "code").mkdir()
+
+    outcome = wizard.run(ask=lambda q, d="": d, root=tmp_path, interactive=False,
+                         store_secrets=False, workspace="~/code")
+
+    assert outcome.values["workspace"] == str(tmp_path / "code")
+
+
+def test_without_the_flag_the_question_is_still_asked(tmp_path):
+    asked: list[str] = []
+
+    def ask(question, default=""):
+        asked.append(question)
+        return default
+
+    wizard.run(ask=ask, root=tmp_path, interactive=False, store_secrets=False)
+
+    assert any("Workspace" in q for q in asked)

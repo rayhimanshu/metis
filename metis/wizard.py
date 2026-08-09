@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from . import secrets
-from .config import CONFIG_NAMES, Config, find_config, load
+from .config import ConfigError, CONFIG_NAMES, Config, find_config, load
 
 Asker = Callable[[str, str | None], str]
 
@@ -143,11 +143,14 @@ def render_config(values: dict[str, Any]) -> str:
 # ------------------------------------------------------------------ flow
 
 
-def collect(ask: Asker, existing: Config | None, interactive: bool = True) -> dict[str, Any]:
+def collect(ask: Asker, existing: Config | None, interactive: bool = True,
+            workspace: str | None = None) -> dict[str, Any]:
     """Gather answers. Every question carries a default that works."""
     values: dict[str, Any] = {}
 
-    values["workspace"] = ask(
+    # An explicit --workspace wins over a remembered one: someone who names a
+    # directory on the command line has just told you which they mean.
+    values["workspace"] = workspace or ask(
         "Workspace -- the directory holding the repos agents will work on",
         str(existing.workspace) if existing else ".",
     )
@@ -258,9 +261,19 @@ def write_config(values: dict[str, Any], root: Path) -> tuple[Path, Path | None]
 
 
 def run(ask: Asker | None = None, root: Path | None = None,
-        interactive: bool = True, store_secrets: bool = True) -> Outcome:
+        interactive: bool = True, store_secrets: bool = True,
+        workspace: str | None = None) -> Outcome:
     ask = ask or _prompt
     root = root or Path.cwd()
+
+    if workspace:
+        resolved = Path(workspace).expanduser()
+        if not resolved.is_dir():
+            raise ConfigError(f"no such directory: {resolved}")
+        # The config belongs beside the code it describes, so naming a
+        # workspace also decides where metis.yaml lands.
+        workspace = str(resolved)
+        root = resolved
 
     found = find_config(root)
     existing = load(found) if found else None
@@ -273,7 +286,7 @@ def run(ask: Asker | None = None, root: Path | None = None,
             print(f"Reading existing configuration from {found}\n")
         print(end="", flush=True)
 
-    values = collect(ask, existing, interactive=interactive)
+    values = collect(ask, existing, interactive=interactive, workspace=workspace)
     config_path, backup = write_config(values, root)
     outcome = Outcome(config_path=config_path, values=values, backup=backup)
 

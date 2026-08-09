@@ -197,11 +197,15 @@ Copies the prompts to your project. Project copies win over packaged ones.
 
 ### Multi-repository workspaces
 
-The workspace is your scope. Point it at one repo, or at a parent holding several — `metis setup` asks for the workspace directory, so run it from the parent:
+The workspace is your scope. Point it at one repo, or at a parent holding
+several:
 
 ```bash
-cd ~/projects/my-platform && metis setup
+metis setup --workspace ~/projects/my-platform
 ```
+
+`metis.yaml` is written into that directory, beside the code it describes.
+Without the flag the wizard asks, defaulting to where you are.
 
 Discovery treats each git root as its own target with its own lock. Agents can work on different repositories simultaneously — never on the same one at the same time.
 

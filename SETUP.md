@@ -59,6 +59,12 @@ Run this **inside the directory you want agents to work in**:
 metis setup
 ```
 
+Or name the directory instead of moving to it:
+
+```bash
+metis setup --workspace ~/projects/my-platform
+```
+
 Pressing enter through every question produces a working configuration. Only
 three things are ever required, and all three have defaults:
 
