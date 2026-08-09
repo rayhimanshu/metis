@@ -336,6 +336,11 @@ anything else.
 **The tracker is the authority.** Label a card `architecture`, `migration`, or
 `needs-review` and it gates, whatever the text says.
 
+**Schema work splits in two.** Adding a column, a table, or an index is
+ordinary feature work and stays autonomous. Dropping, renaming, altering, or
+migrating does not -- no test catches a dropped column, because the build is
+green precisely because it is gone.
+
 **Heuristics may only escalate.** Wording can raise a task to gated; nothing
 can lower one. A classifier that quietly decides "just a bug fix" and is wrong
 is the single failure a safety gate cannot have, so that direction is

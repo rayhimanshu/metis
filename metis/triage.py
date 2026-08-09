@@ -51,9 +51,30 @@ ESCALATIONS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("creates or splits a service",
      re.compile(r"\b(new (?:micro)?service|extract (?:a )?service|split (?:out|the)|"
                 r"stand up a|spin up a|separate (?:micro)?service)\b", re.I)),
-    ("changes a database schema",
-     re.compile(r"\b(migrat(?:e|ion)|alter table|drop (?:table|column)|"
-                r"new (?:table|collection|index)|schema change|backfill)\b", re.I)),
+    # Schema work splits in two, and only one half is dangerous.
+    #
+    # Additive changes -- a new column, a new table, a new index -- are ordinary
+    # feature work. Gating them is noise, and noise is how a review queue starts
+    # getting waved through.
+    #
+    # Destructive ones lose data or break readers, and no test suite catches
+    # that: the build is green precisely because the column is gone. These match
+    # loosely on purpose, because tickets say "drop the audit_log table", not
+    # "DROP TABLE".
+    ("makes a destructive schema change",
+     re.compile(r"\b(?:drop|truncate|delete|remove|purge)\b[^.\n]{0,40}"
+                r"\b(?:table|column|field|collection|index|constraint)\b"
+                r"|\b(?:table|column|field|collection)\b[^.\n]{0,25}"
+                r"\b(?:is |be )?(?:dropped|removed|deleted|truncated)\b"
+                r"|\balter\b[^.\n]{0,40}\b(?:table|column|type)\b"
+                r"|\brename\b[^.\n]{0,40}\b(?:table|column|field)\b"
+                r"|\bdrop\s+(?:table|column)\b", re.I)),
+
+    # Separate from the above: a migration is a production-affecting operation
+    # whatever it contains -- it locks, it runs once, and it is awkward to undo.
+    ("runs a schema migration or backfill",
+     re.compile(r"\b(migrat(?:e|ion|ions)|backfill|reindex|"
+                r"schema change|data fix(?:up)?)\b", re.I)),
     ("takes a new dependency",
      re.compile(r"\b(add (?:a )?(?:new )?(?:dependency|library|package|sdk)|"
                 r"switch to|replace .{0,20}\bwith\b|adopt)\b", re.I)),

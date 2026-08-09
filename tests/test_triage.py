@@ -48,7 +48,7 @@ def test_ordinary_work_stays_autonomous(title):
 @pytest.mark.parametrize("title,expected_reason", [
     ("Add a terraform module for the new bucket", "infrastructure"),
     ("Extract a service for notifications", "service"),
-    ("Write a migration to drop the legacy column", "schema"),
+    ("Write a migration to drop the legacy column", "migration"),
     ("Switch to pydantic v2 across the codebase", "dependency"),
     ("Move to a larger instance type for throughput", "cost"),
     ("Breaking change: rename the userId field", "contract"),
@@ -189,3 +189,47 @@ def test_pending_reports_why_it_stopped(store):
     assert len(waiting) == 1
     assert waiting[0]["issue_key"] == "LG-1"
     assert "infrastructure" in waiting[0]["reasons"][0]
+
+
+# ------------------------------------------------- schema work splits in two
+#
+# The first cut of this gated "create a new table" while letting "drop the
+# audit_log table" through, because the pattern wanted the literal adjacent
+# words `drop table` and real tickets say "drop the X table". Catching the
+# harmless phrasing and missing every destructive one is the exact failure
+# direction a gate cannot have, so both halves are pinned here.
+
+
+@pytest.mark.parametrize("title", [
+    "Add a created_at column to the orders table",
+    "Add a nullable nickname field to users",
+    "Create a new table for feature flags",
+    "Add an index on orders.customer_id",
+    "Store the webhook retry count",
+])
+def test_additive_schema_work_stays_autonomous(title):
+    """Ordinary feature work. Gating it is noise, and noise gets waved through."""
+    assert not triage.classify(title, "").gated
+
+
+@pytest.mark.parametrize("title", [
+    "Drop the legacy audit_log table",
+    "Drop the deprecated email_verified column",
+    "Alter the orders table to change amount to numeric",
+    "Rename the user_id column across all tables",
+    "Remove the unused preferences column",
+    "The legacy sessions table should be dropped",
+])
+def test_destructive_schema_work_is_gated(title):
+    """No test suite catches these: the build is green because the column is gone."""
+    assert triage.classify(title, "").gated
+
+
+@pytest.mark.parametrize("title", [
+    "Backfill customer_tier for all existing rows",
+    "Write a migration to add the new status column",
+    "Reindex the search collection",
+])
+def test_migrations_are_gated_even_when_additive(title):
+    """A migration locks, runs once, and is awkward to undo, whatever it contains."""
+    assert triage.classify(title, "").gated
